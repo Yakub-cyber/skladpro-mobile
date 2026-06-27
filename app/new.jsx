@@ -1,6 +1,6 @@
 import { View, Text, ScrollView, Pressable } from 'react-native'
 import { router } from 'expo-router'
-import { X, ScanLine, ClipboardList, Navigation, Package, UserSquare2, ChevronRight } from 'lucide-react-native'
+import { X, ScanLine, ClipboardList, Navigation, Package, UserSquare2, ChevronRight, Sparkles } from 'lucide-react-native'
 import { useStore } from '../store/useStore'
 import { Screen, C } from '../components/ui'
 import { roleInfo, canAccess } from '../lib/constants'
@@ -8,6 +8,7 @@ import { roleInfo, canAccess } from '../lib/constants'
 const OPS = [
   { perm: 'orders', label: 'Продажа', sub: 'Касса, сканер штрихкодов', icon: ScanLine, to: '/pos', color: C.brand },
   { perm: 'orders', label: 'Заказы', sub: 'Оформление и статусы', icon: ClipboardList, to: '/orders', color: C.info },
+  { perm: 'invoices', label: 'ИИ-накладная', sub: 'Приёмка из текста', icon: Sparkles, to: '/invoice', color: C.brand },
   { perm: 'delivery', label: 'Доставка', sub: 'Маршрут и отметки', icon: Navigation, to: '/delivery', color: C.warn },
   { perm: 'products', label: 'Товары и приёмка', sub: 'Остатки, приёмка, списание', icon: Package, to: '/products', color: C.ok },
   { perm: 'customers', label: 'Клиенты', sub: 'Долги и оплаты', icon: UserSquare2, to: '/customers', color: C.info },

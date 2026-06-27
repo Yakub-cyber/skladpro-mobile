@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Pressable, Modal, Linking } from 'react-native'
 import { MapPin, Navigation as NavIcon, Check, Route as RouteIcon, X, Circle, CheckCircle2 } from 'lucide-react-native'
 import { useStore } from '../../store/useStore'
 import { Screen, Card, Badge, Empty, Btn, C, tone } from '../../components/ui'
+import { DeliveryMap } from '../../components/DeliveryMap'
 import { money } from '../../lib/format'
 import { statusInfo } from '../../lib/constants'
 import { geoLatLng, buildDeliveryRoute, DEPOT, fmtDuration } from '../../lib/geo'
@@ -39,6 +40,10 @@ export default function Delivery() {
   const route = useMemo(() => buildDeliveryRoute(selectedOrders.map((o) => geoLatLng(o))), [selectedOrders])
   const ordered = route.order.map((i) => selectedOrders[i])
 
+  // точки для карты: выбранные в порядке маршрута (с номерами) или все деливери
+  const mapBase = sel.size ? ordered : list
+  const mapStops = mapBase.map((o, i) => ({ ...geoLatLng(o), n: i + 1, title: o.customerName, label: o.address, priority: o.priority, id: o.id }))
+
   const openMap = (addr) => Linking.openURL(`https://yandex.ru/maps/?text=${encodeURIComponent(addr || '')}`)
   const openRouteMap = () => {
     const pts = [DEPOT, ...ordered.map((o) => geoLatLng(o)), DEPOT]
@@ -54,6 +59,14 @@ export default function Delivery() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 6, paddingBottom: sel.size ? 110 : 24 }}>
+        {list.length > 0 && (
+          <View className="mb-3">
+            <DeliveryMap depot={DEPOT} stops={mapStops} line={sel.size ? null : []} height={240} />
+            {sel.size > 0 && (
+              <Text className="text-muted text-[12px] mt-1.5 text-center">Маршрут по {sel.size} точкам · ~{route.distanceKm} км</Text>
+            )}
+          </View>
+        )}
         {list.length === 0 && <Empty title="Нет заказов к доставке" icon={NavIcon} />}
         {list.map((o) => {
           const si = statusInfo(o.status)

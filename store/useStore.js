@@ -21,7 +21,9 @@ import {
   acceptInvitation,
   checkRecovery,
   changePassword,
+  subscribeOrders,
 } from '../lib/cloud'
+import { initPush, notify } from '../lib/push'
 
 // Слой данных. Сейчас источник истины — localStorage (persist).
 // Чтобы переключиться на реальный API/Supabase, эти actions заменяются
@@ -39,6 +41,7 @@ export const useStore = create(
       sessionChecked: false, // первичная проверка сессии завершена (для splash)
       needOnboarding: false, // вошёл, но компании ещё нет
       recoveryMode: false, // перешёл по ссылке сброса пароля → ввод нового
+      _ordersSub: null, // отписка от realtime-уведомлений
       companyId: null,
       companyName: null,
 
@@ -140,6 +143,23 @@ export const useStore = create(
             cloudError: null,
           })
           attachSync(useStore)
+          // Уведомления: realtime-подписка на заказы компании
+          initPush()
+          const prevSub = get()._ordersSub
+          if (prevSub) prevSub()
+          const meId = me.id
+          const myRole = me.role
+          const unsub = subscribeOrders(companyId, (payload) => {
+            const { eventType, new: nw, old } = payload
+            if (eventType === 'INSERT' && myRole !== 'courier') {
+              notify('Новый заказ', `${nw.no} · ${nw.customer_name || ''}`.trim(), { id: nw.id })
+            } else if (eventType === 'UPDATE' && nw.assigned_to === meId && old?.assigned_to !== nw.assigned_to) {
+              notify('Заказ на доставку', `Вам назначен ${nw.no}`, { id: nw.id })
+            } else if (eventType === 'UPDATE' && nw.status === 'delivered' && old?.status !== 'delivered' && myRole !== 'courier') {
+              notify('Заказ доставлен', `${nw.no} · ${nw.customer_name || ''}`.trim(), { id: nw.id })
+            }
+          })
+          set({ _ordersSub: unsub })
         } catch (e) {
           set({ cloudError: e?.message || e?.code || String(e) })
         } finally {
@@ -168,8 +188,9 @@ export const useStore = create(
         return r
       },
       cloudLogout: async () => {
+        get()._ordersSub?.()
         await cloudSignOut()
-        set({ authUserId: null, cloudReady: false, needOnboarding: false, companyId: null, companyName: null })
+        set({ authUserId: null, cloudReady: false, needOnboarding: false, companyId: null, companyName: null, _ordersSub: null })
       },
       // Завершить сброс пароля: задать новый и войти в приложение
       completePasswordReset: async (newPassword) => {
@@ -721,7 +742,7 @@ export const useStore = create(
       version: 6,
       // не сохраняем runtime-флаги облака (иначе после reload не переинициализируется)
       partialize: (state) => {
-        const { _authInited, _bootBusy, _creating, sessionChecked, cloudReady, needOnboarding, recoveryMode, cloudError, ...rest } = state
+        const { _authInited, _bootBusy, _creating, _ordersSub, sessionChecked, cloudReady, needOnboarding, recoveryMode, cloudError, ...rest } = state
         return rest
       },
       migrate: (state, version) => {

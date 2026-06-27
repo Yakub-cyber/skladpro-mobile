@@ -10,7 +10,8 @@ import { statusInfo } from '../../lib/constants'
 export default function CustomerDetail() {
   const { id } = useLocalSearchParams()
   const customer = useStore((s) => s.customers.find((c) => c.id === id))
-  const orders = useStore((s) => s.orders.filter((o) => o.customerId === id))
+  const allOrders = useStore((s) => s.orders)
+  const orders = useMemo(() => allOrders.filter((o) => o.customerId === id), [allOrders, id])
   const addPayment = useStore((s) => s.addPayment)
   const [payOpen, setPayOpen] = useState(false)
 

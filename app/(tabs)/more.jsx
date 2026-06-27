@@ -9,7 +9,10 @@ import { Screen, Card, Avatar, Badge, Btn, Input, Field, C } from '../../compone
 import { roleInfo, canAccess } from '../../lib/constants'
 
 export default function More() {
-  const { employees, authUserId, companyName, cloudLogout } = useStore()
+  const employees = useStore((s) => s.employees)
+  const authUserId = useStore((s) => s.authUserId)
+  const companyName = useStore((s) => s.companyName)
+  const cloudLogout = useStore((s) => s.cloudLogout)
   const me = employees.find((e) => e.id === authUserId)
   const role = roleInfo(me?.role || 'admin')
   const [email, setEmail] = useState('')

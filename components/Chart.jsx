@@ -22,7 +22,7 @@ export function AreaChart({ series = [], height = 200, color = C.brand }) {
 
   return (
     <View>
-      <View onLayout={(e) => setW(e.nativeEvent.layout.width)} style={{ height }}>
+      <View onLayout={(e) => { const nw = e.nativeEvent.layout.width; setW((p) => (Math.abs(p - nw) > 0.5 ? nw : p)) }} style={{ height }}>
         {w > 0 && (
           <Svg width={w} height={height}>
             <Defs>

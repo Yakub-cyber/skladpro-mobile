@@ -23,7 +23,7 @@ export function WarehouseMap({ cells = [], products = [], highlight = [], select
   }, [products])
 
   return (
-    <View onLayout={(e) => setW(e.nativeEvent.layout.width)} style={{ width: '100%' }}>
+    <View onLayout={(e) => { const nw = e.nativeEvent.layout.width; setW((p) => (Math.abs(p - nw) > 0.5 ? nw : p)) }} style={{ width: '100%' }}>
       {w > 0 && (
         <Svg width={w} height={height} viewBox={`0 0 ${W} ${H}`}>
           <Rect x={1} y={1} width={W - 2} height={H - 2} rx={14} fill={C.surface} stroke={C.line} strokeWidth={2} />

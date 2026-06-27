@@ -8,7 +8,10 @@ import { money, num } from '../lib/format'
 import { CATEGORIES, catInfo, priceFor } from '../lib/constants'
 
 export default function Storefront() {
-  const { products, priceTypes, addOrder, addCustomer } = useStore()
+  const products = useStore((s) => s.products)
+  const priceTypes = useStore((s) => s.priceTypes)
+  const addOrder = useStore((s) => s.addOrder)
+  const addCustomer = useStore((s) => s.addCustomer)
   const defType = priceTypes.find((t) => t.default)?.id || priceTypes[0]?.id
   const [q, setQ] = useState('')
   const [cat, setCat] = useState('all')

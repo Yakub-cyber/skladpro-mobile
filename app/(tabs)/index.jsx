@@ -18,7 +18,12 @@ const PERIODS = [
 ]
 
 export default function Dashboard() {
-  const { products, orders, customers, employees, authUserId, companyName } = useStore()
+  const products = useStore((s) => s.products)
+  const orders = useStore((s) => s.orders)
+  const customers = useStore((s) => s.customers)
+  const employees = useStore((s) => s.employees)
+  const authUserId = useStore((s) => s.authUserId)
+  const companyName = useStore((s) => s.companyName)
   const me = employees.find((e) => e.id === authUserId)
   const role = roleInfo(me?.role || 'admin')
   const [period, setPeriod] = useState('month')

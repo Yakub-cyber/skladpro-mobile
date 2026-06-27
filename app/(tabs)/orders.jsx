@@ -9,7 +9,9 @@ import { statusInfo, nextStatus } from '../../lib/constants'
 
 const FILTERS = [
   { key: 'all', label: 'Все' },
-  { key: 'active', label: 'В работе' },
+  { key: 'new', label: 'Новые' },
+  { key: 'picking', label: 'Сборка' },
+  { key: 'shipped', label: 'В пути' },
   { key: 'delivered', label: 'Доставлены' },
 ]
 
@@ -23,28 +25,37 @@ export default function Orders() {
   const me = employees.find((e) => e.id === authUserId)
   const isCourier = me?.role === 'courier'
 
+  const mine = useMemo(
+    () => (isCourier ? allOrders.filter((o) => o.assignedTo === authUserId) : allOrders),
+    [allOrders, isCourier, authUserId],
+  )
+  const inProcess = mine.filter((o) => ['new', 'confirmed', 'picking'].includes(o.status)).length
+
   const orders = useMemo(() => {
-    let list = isCourier ? allOrders.filter((o) => o.assignedTo === authUserId) : allOrders
-    if (filter === 'active') list = list.filter((o) => ['new', 'confirmed', 'picking', 'packed', 'shipped'].includes(o.status))
+    let list = mine
+    if (filter === 'new') list = list.filter((o) => ['new', 'confirmed'].includes(o.status))
+    else if (filter === 'picking') list = list.filter((o) => o.status === 'picking')
+    else if (filter === 'shipped') list = list.filter((o) => ['packed', 'shipped'].includes(o.status))
     else if (filter === 'delivered') list = list.filter((o) => o.status === 'delivered')
     return [...list].sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1))
-  }, [allOrders, filter, isCourier, authUserId])
+  }, [mine, filter])
 
   return (
     <Screen>
       <View className="px-4 pt-3 pb-2">
-        <Text className="text-ink text-xl font-bold mb-3">Заказы</Text>
-        <View className="flex-row gap-2">
+        <Text className="text-ink text-xl font-bold">Заказы</Text>
+        <Text className="text-muted text-[13px] mb-3">{mine.length} всего · {inProcess} в обработке</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
           {FILTERS.map((f) => (
             <Pressable
               key={f.key}
               onPress={() => setFilter(f.key)}
-              className={`px-3 h-8 rounded-lg items-center justify-center ${filter === f.key ? 'bg-brand' : 'bg-surface-2'}`}
+              className={`px-3.5 h-8 rounded-lg items-center justify-center ${filter === f.key ? 'bg-brand' : 'bg-surface-2'}`}
             >
               <Text className={`text-[13px] font-medium ${filter === f.key ? 'text-brand-ink' : 'text-muted'}`}>{f.label}</Text>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 6, paddingBottom: 24 }}>

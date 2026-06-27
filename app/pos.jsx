@@ -5,19 +5,27 @@ import { ChevronLeft, Search, ScanLine, Plus, Minus, Check } from 'lucide-react-
 import { useStore } from '../store/useStore'
 import { Screen, Card, Input, Empty, Btn, C } from '../components/ui'
 import { money, num } from '../lib/format'
+import { CATEGORIES, catInfo } from '../lib/constants'
 import Scanner from '../components/Scanner'
 
 export default function Pos() {
   const products = useStore((s) => s.products)
   const addOrder = useStore((s) => s.addOrder)
   const [q, setQ] = useState('')
+  const [cat, setCat] = useState('all')
   const [cart, setCart] = useState({}) // productId -> qty
   const [scanOpen, setScanOpen] = useState(false)
 
   const list = useMemo(() => {
     const s = q.trim().toLowerCase()
-    return products.filter((p) => !s || p.name.toLowerCase().includes(s) || (p.sku || '').toLowerCase().includes(s))
-  }, [products, q])
+    return products.filter(
+      (p) =>
+        (cat === 'all' || p.category === cat) &&
+        (!s || p.name.toLowerCase().includes(s) || (p.sku || '').toLowerCase().includes(s)),
+    )
+  }, [products, q, cat])
+
+  const chips = [{ key: 'all', name: 'Все', color: C.brand }, ...CATEGORIES.map((c) => ({ key: c.key, name: c.key, color: c.color }))]
 
   const add = (id) => setCart((c) => ({ ...c, [id]: (c[id] || 0) + 1 }))
   const dec = (id) =>
@@ -69,6 +77,26 @@ export default function Pos() {
         <Pressable onPress={() => setScanOpen(true)} className="h-11 w-11 rounded-xl bg-brand items-center justify-center active:opacity-80">
           <ScanLine size={20} color="#fff" />
         </Pressable>
+      </View>
+
+      {/* Категории */}
+      <View className="h-11">
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, alignItems: 'center' }}>
+          {chips.map((c) => {
+            const on = cat === c.key
+            return (
+              <Pressable
+                key={c.key}
+                onPress={() => setCat(c.key)}
+                className="px-3.5 h-9 rounded-full items-center justify-center flex-row"
+                style={{ backgroundColor: on ? c.color : C.surface2, borderWidth: 1, borderColor: on ? c.color : C.line }}
+              >
+                {c.key !== 'all' && <View className="h-2 w-2 rounded-full mr-1.5" style={{ backgroundColor: on ? '#fff' : c.color }} />}
+                <Text className="text-[13px] font-medium" style={{ color: on ? '#fff' : C.muted }}>{c.name}</Text>
+              </Pressable>
+            )
+          })}
+        </ScrollView>
       </View>
 
       {/* Каталог */}

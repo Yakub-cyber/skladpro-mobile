@@ -36,7 +36,7 @@ export default function Dashboard() {
   const inWork = orders.filter((o) => ['new', 'confirmed', 'picking', 'packed'].includes(o.status)).length
   const revenue = orders.filter((o) => o.status === 'delivered').reduce((a, o) => a + (o.total || 0), 0)
   const lowStock = products.filter((p) => p.stock <= p.minStock).length
-  const debt = customers.reduce((a, c) => a + Math.max(0, -(c.balance || 0)), 0)
+  const debt = customers.reduce((a, c) => a + Math.max(0, c.balance || 0), 0)
   const recent = [...orders].sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1)).slice(0, 5)
 
   const actions = ACTIONS.filter((a) => canAccess(role.key, a.perm) && !(a.hideCourier && isCourier))

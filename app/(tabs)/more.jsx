@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { View, Text, ScrollView, Pressable, Modal, Alert } from 'react-native'
 import { router } from 'expo-router'
-import { LogOut, ShieldCheck, Building2, Mail, KeyRound, Users, ChevronRight, X } from 'lucide-react-native'
+import { LogOut, ShieldCheck, Building2, Mail, KeyRound, Users, ChevronRight, X, UserSquare2, History, BarChart3 } from 'lucide-react-native'
 import { useStore } from '../../store/useStore'
 import { supabase } from '../../lib/supabase'
 import { changePassword } from '../../lib/cloud'
@@ -42,6 +42,23 @@ export default function More() {
           <Row icon={Mail} label="Email" value={email || '—'} border />
           <Row icon={ShieldCheck} label="Роль" value={role.label} border />
         </Card>
+
+        {/* Разделы */}
+        {(() => {
+          const sections = [
+            { perm: 'customers', icon: UserSquare2, label: 'Клиенты и долги', to: '/customers' },
+            { perm: 'orders', icon: History, label: 'История', to: '/history' },
+            { perm: 'analytics', icon: BarChart3, label: 'Аналитика', to: '/analytics' },
+          ].filter((s) => canAccess(me?.role, s.perm))
+          if (!sections.length) return null
+          return (
+            <Card className="overflow-hidden mb-4">
+              {sections.map((s, i) => (
+                <Action key={s.to} icon={s.icon} label={s.label} onPress={() => router.push(s.to)} border={i > 0} />
+              ))}
+            </Card>
+          )
+        })()}
 
         {/* Действия */}
         <Card className="overflow-hidden mb-4">

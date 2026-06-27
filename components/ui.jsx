@@ -132,3 +132,46 @@ export function Empty({ title, text, icon: Icon }) {
     </View>
   )
 }
+
+// KPI-карточка (как Stat на сайте): иконка в цветном квадрате + label/value/sub/trend
+export function Stat({ label, value, sub, icon: Icon, color = C.brand, trend }) {
+  return (
+    <Card className="p-4 flex-row items-center">
+      <View className="h-11 w-11 rounded-xl items-center justify-center" style={{ backgroundColor: color + '22' }}>
+        {Icon && <Icon size={20} color={color} />}
+      </View>
+      <View className="flex-1 ml-3.5">
+        <Text className="text-muted text-[13px]" numberOfLines={1}>{label}</Text>
+        <Text className="text-ink text-[19px] font-bold leading-6" numberOfLines={1}>{value}</Text>
+        {(sub || trend != null) && (
+          <View className="flex-row items-center mt-0.5">
+            {trend != null && (
+              <Text className="text-[12px] mr-1" style={{ color: trend >= 0 ? C.ok : C.bad }}>
+                {trend >= 0 ? '▲' : '▼'} {Math.abs(trend)}%
+              </Text>
+            )}
+            {sub ? <Text className="text-muted text-[12px]" numberOfLines={1}>{sub}</Text> : null}
+          </View>
+        )}
+      </View>
+    </Card>
+  )
+}
+
+// Секция-карточка с заголовком/подзаголовком/действием (как Section на сайте)
+export function Section({ title, subtitle, action, children, className = '' }) {
+  return (
+    <Card className={`p-4 ${className}`}>
+      {(title || action) && (
+        <View className="flex-row items-start justify-between mb-3">
+          <View className="flex-1 pr-2">
+            {title ? <Text className="text-ink font-semibold text-[15px]">{title}</Text> : null}
+            {subtitle ? <Text className="text-muted text-[13px] mt-0.5">{subtitle}</Text> : null}
+          </View>
+          {action}
+        </View>
+      )}
+      {children}
+    </Card>
+  )
+}

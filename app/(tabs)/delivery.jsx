@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { View, Text, ScrollView, Pressable, Linking } from 'react-native'
 import { MapPin, Navigation as NavIcon, Check } from 'lucide-react-native'
 import { useStore } from '../../store/useStore'
-import { Screen, Card, Badge, Empty, C } from '../../components/ui'
+import { Screen, Card, Badge, Empty, C, tone } from '../../components/ui'
 import { money } from '../../lib/format'
 import { statusInfo } from '../../lib/constants'
 
@@ -48,7 +48,7 @@ export default function Delivery() {
             <Card key={o.id} className="p-4 mb-2.5">
               <View className="flex-row items-center justify-between">
                 <Text className="text-ink font-semibold text-[15px]">{o.no}</Text>
-                <Badge color={si.color}>{si.label}</Badge>
+                <Badge color={tone(si.color)}>{si.label}</Badge>
               </View>
               <Text className="text-ink text-[14px] mt-1.5">{o.customerName}</Text>
               <Pressable onPress={() => openMap(o.address)} className="flex-row items-center mt-1.5">

@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react'
 import { View, Text, ScrollView, Pressable } from 'react-native'
-import { ChevronRight, Flag } from 'lucide-react-native'
+import { router } from 'expo-router'
+import { ChevronRight, Flag, ScanLine } from 'lucide-react-native'
 import { useStore } from '../../store/useStore'
-import { Screen, Card, Badge, Empty, C } from '../../components/ui'
+import { Screen, Card, Badge, Empty, C, tone } from '../../components/ui'
 import { money } from '../../lib/format'
 import { statusInfo, nextStatus } from '../../lib/constants'
 
@@ -53,32 +54,46 @@ export default function Orders() {
           const nx = nextStatus(o.status)
           const nxInfo = nx && statusInfo(nx)
           return (
-            <Card key={o.id} className="p-4 mb-2.5">
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center">
-                  {o.priority && <Flag size={13} color={C.bad} />}
-                  <Text className="text-ink font-semibold text-[15px] ml-1">{o.no}</Text>
+            <Pressable key={o.id} onPress={() => router.push(`/order/${o.id}`)} className="active:opacity-90">
+              <Card className="p-4 mb-2.5">
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center">
+                    {o.priority && <Flag size={13} color={C.bad} />}
+                    <Text className="text-ink font-semibold text-[15px] ml-1">{o.no}</Text>
+                  </View>
+                  <Badge color={tone(si.color)}>{si.label}</Badge>
                 </View>
-                <Badge color={si.color}>{si.label}</Badge>
-              </View>
-              <Text className="text-ink text-[14px] mt-1.5" numberOfLines={1}>{o.customerName}</Text>
-              <View className="flex-row items-center justify-between mt-1">
-                <Text className="text-muted text-[12px]" numberOfLines={1}>{o.address}</Text>
-                <Text className="text-ink font-semibold">{money(o.total)}</Text>
-              </View>
-              {nx && o.status !== 'cancelled' && (
-                <Pressable
-                  onPress={() => advanceOrder(o.id)}
-                  className="flex-row items-center justify-center mt-3 h-10 rounded-xl bg-surface-2 active:opacity-80"
-                >
-                  <Text className="text-brand font-semibold text-[14px]">В статус «{nxInfo.label}»</Text>
-                  <ChevronRight size={16} color={C.brand} />
-                </Pressable>
-              )}
-            </Card>
+                <Text className="text-ink text-[14px] mt-1.5" numberOfLines={1}>{o.customerName}</Text>
+                <View className="flex-row items-center justify-between mt-1">
+                  <Text className="text-muted text-[12px]" numberOfLines={1}>{o.address}</Text>
+                  <Text className="text-ink font-semibold">{money(o.total)}</Text>
+                </View>
+                {nx && o.status !== 'cancelled' && (
+                  <Pressable
+                    onPress={() => advanceOrder(o.id)}
+                    className="flex-row items-center justify-center mt-3 h-10 rounded-xl bg-surface-2 active:opacity-80"
+                  >
+                    <Text className="text-brand font-semibold text-[14px]">В статус «{nxInfo.label}»</Text>
+                    <ChevronRight size={16} color={C.brand} />
+                  </Pressable>
+                )}
+              </Card>
+            </Pressable>
           )
         })}
       </ScrollView>
+
+      {/* Касса — быстрая продажа (не для курьера) */}
+      {!isCourier && (
+        <Pressable
+          onPress={() => router.push('/pos')}
+          className="absolute bottom-5 right-5 h-14 px-5 rounded-2xl bg-brand flex-row items-center active:opacity-80"
+          style={{ shadowColor: C.brand, shadowOpacity: 0.4, shadowRadius: 12, elevation: 6 }}
+        >
+          <ScanLine size={20} color="#fff" />
+          <Text className="text-white font-semibold ml-2">Касса</Text>
+        </Pressable>
+      )}
     </Screen>
   )
 }

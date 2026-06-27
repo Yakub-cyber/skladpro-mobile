@@ -18,6 +18,9 @@ export const C = {
   info: '#38BDF8',
 }
 
+// Имя тона ('info'/'warn'/'brand'/'ok'/'bad') → hex из палитры
+export const tone = (name) => C[name] || C.brand
+
 // Обёртка экрана с безопасной зоной
 export function Screen({ children, className = '', edges = ['top'] }) {
   return (

@@ -1,17 +1,19 @@
-import { View, Text, ScrollView, Pressable, Alert } from 'react-native'
+import { useEffect, useState } from 'react'
+import { View, Text, ScrollView, Pressable, Modal, Alert } from 'react-native'
 import { router } from 'expo-router'
-import { LogOut, ShieldCheck, Building2, Mail } from 'lucide-react-native'
+import { LogOut, ShieldCheck, Building2, Mail, KeyRound, Users, ChevronRight, X } from 'lucide-react-native'
 import { useStore } from '../../store/useStore'
 import { supabase } from '../../lib/supabase'
-import { Screen, Card, Avatar, Badge, C } from '../../components/ui'
-import { roleInfo } from '../../lib/constants'
-import { useEffect, useState } from 'react'
+import { changePassword } from '../../lib/cloud'
+import { Screen, Card, Avatar, Badge, Btn, Input, Field, C } from '../../components/ui'
+import { roleInfo, canAccess } from '../../lib/constants'
 
 export default function More() {
   const { employees, authUserId, companyName, cloudLogout } = useStore()
   const me = employees.find((e) => e.id === authUserId)
   const role = roleInfo(me?.role || 'admin')
   const [email, setEmail] = useState('')
+  const [pwOpen, setPwOpen] = useState(false)
 
   useEffect(() => {
     supabase?.auth.getUser().then(({ data }) => setEmail(data?.user?.email || ''))
@@ -41,6 +43,14 @@ export default function More() {
           <Row icon={ShieldCheck} label="Роль" value={role.label} border />
         </Card>
 
+        {/* Действия */}
+        <Card className="overflow-hidden mb-4">
+          {canAccess(me?.role, 'employees') && (
+            <Action icon={Users} label="Команда и приглашения" onPress={() => router.push('/team')} />
+          )}
+          <Action icon={KeyRound} label="Сменить пароль" onPress={() => setPwOpen(true)} border={canAccess(me?.role, 'employees')} />
+        </Card>
+
         <Pressable
           onPress={logout}
           className="flex-row items-center justify-center h-12 rounded-xl bg-surface-2 active:opacity-80"
@@ -51,6 +61,8 @@ export default function More() {
 
         <Text className="text-muted text-[12px] text-center mt-6">СкладПро · мобильное приложение</Text>
       </ScrollView>
+
+      <PasswordModal open={pwOpen} onClose={() => setPwOpen(false)} />
     </Screen>
   )
 }
@@ -62,5 +74,59 @@ function Row({ icon: Icon, label, value, border }) {
       <Text className="text-muted text-[14px] ml-3 flex-1">{label}</Text>
       <Text className="text-ink text-[14px] font-medium" numberOfLines={1}>{value}</Text>
     </View>
+  )
+}
+
+function Action({ icon: Icon, label, onPress, border }) {
+  return (
+    <Pressable onPress={onPress} className={`flex-row items-center px-4 py-3.5 active:bg-surface-2 ${border ? 'border-t border-line' : ''}`}>
+      <Icon size={18} color={C.brand} />
+      <Text className="text-ink text-[14px] ml-3 flex-1">{label}</Text>
+      <ChevronRight size={18} color={C.muted} />
+    </Pressable>
+  )
+}
+
+function PasswordModal({ open, onClose }) {
+  const [pass, setPass] = useState('')
+  const [pass2, setPass2] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  const save = async () => {
+    if (pass.length < 6) return setErr('Минимум 6 символов')
+    if (pass !== pass2) return setErr('Пароли не совпадают')
+    setBusy(true)
+    setErr('')
+    const r = await changePassword(pass)
+    setBusy(false)
+    if (!r.ok) return setErr(r.error)
+    setPass('')
+    setPass2('')
+    onClose()
+    Alert.alert('Готово', 'Пароль изменён')
+  }
+
+  return (
+    <Modal visible={open} animationType="slide" transparent onRequestClose={onClose}>
+      <View className="flex-1 justify-end bg-black/50">
+        <View className="bg-surface rounded-t-3xl p-5 pb-8">
+          <View className="flex-row items-center justify-between mb-4">
+            <Text className="text-ink text-lg font-bold">Сменить пароль</Text>
+            <Pressable onPress={onClose} className="h-9 w-9 items-center justify-center">
+              <X size={22} color={C.muted} />
+            </Pressable>
+          </View>
+          <Field label="Новый пароль" hint="Минимум 6 символов">
+            <Input value={pass} onChangeText={setPass} placeholder="••••••••" secureTextEntry />
+          </Field>
+          <Field label="Повторите пароль">
+            <Input value={pass2} onChangeText={setPass2} placeholder="••••••••" secureTextEntry />
+          </Field>
+          {err ? <Text className="text-bad text-[13px] mb-2">{err}</Text> : null}
+          <Btn title={busy ? 'Сохраняем…' : 'Сохранить'} onPress={save} loading={busy} className="mt-2" />
+        </View>
+      </View>
+    </Modal>
   )
 }

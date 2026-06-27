@@ -22,8 +22,9 @@ import {
   checkRecovery,
   changePassword,
   subscribeOrders,
+  savePushToken,
 } from '../lib/cloud'
-import { initPush, notify } from '../lib/push'
+import { initPush, notify, getDeviceToken } from '../lib/push'
 
 // Слой данных. Сейчас источник истины — localStorage (persist).
 // Чтобы переключиться на реальный API/Supabase, эти actions заменяются
@@ -145,6 +146,8 @@ export const useStore = create(
           attachSync(useStore)
           // Уведомления: realtime-подписка на заказы компании
           initPush()
+          // FCM-токен для push на закрытое приложение (если настроен Firebase)
+          getDeviceToken().then((t) => t && savePushToken(t, companyId)).catch(() => {})
           const prevSub = get()._ordersSub
           if (prevSub) prevSub()
           const meId = me.id

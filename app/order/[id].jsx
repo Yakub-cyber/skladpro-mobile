@@ -1,16 +1,39 @@
+import { useMemo } from 'react'
 import { View, Text, ScrollView, Pressable } from 'react-native'
 import { useLocalSearchParams, router } from 'expo-router'
-import { ChevronLeft, ChevronRight, MapPin, Truck, Check, X, Flag } from 'lucide-react-native'
+import { ChevronLeft, ChevronRight, MapPin, Truck, Check, X, Flag, Route as RouteIcon } from 'lucide-react-native'
 import { useStore } from '../../store/useStore'
+import { WarehouseMap } from '../../components/WarehouseMap'
 import { Screen, Card, Badge, Empty, Btn, C, tone } from '../../components/ui'
 import { money, num, dateTime } from '../../lib/format'
-import { statusInfo, nextStatus, TRACK_FLOW } from '../../lib/constants'
+import { statusInfo, nextStatus, TRACK_FLOW, canAccess, roleInfo } from '../../lib/constants'
+import { buildPickRoute } from '../../lib/ai'
 
 export default function OrderDetail() {
   const { id } = useLocalSearchParams()
   const order = useStore((s) => s.orders.find((o) => o.id === id))
+  const cells = useStore((s) => s.cells)
+  const products = useStore((s) => s.products)
+  const employees = useStore((s) => s.employees)
+  const authUserId = useStore((s) => s.authUserId)
   const advanceOrder = useStore((s) => s.advanceOrder)
   const cancelOrder = useStore((s) => s.cancelOrder)
+
+  const me = employees.find((e) => e.id === authUserId)
+  const canPick = canAccess(me?.role, 'warehouse')
+
+  // маршрут сборки по ячейкам позиций
+  const pick = useMemo(() => {
+    if (!order) return { order: [], distance: 0, cells: [] }
+    const pts = order.items
+      .map((it) => {
+        const c = cells.find((x) => x.code === it.cell)
+        return c ? { x: c.x, y: c.y, code: it.cell, name: it.name, qty: it.qty, unit: it.unit } : null
+      })
+      .filter(Boolean)
+    const r = buildPickRoute(pts)
+    return { ...r, cells: pts.map((p) => p.code) }
+  }, [order, cells])
 
   if (!order) {
     return (
@@ -99,7 +122,7 @@ export default function OrderDetail() {
               <View className="flex-1 pr-2">
                 <Text className="text-ink text-[14px]" numberOfLines={1}>{it.name}</Text>
                 <Text className="text-muted text-[12px] mt-0.5">
-                  {num(it.qty)} {it.unit} × {money(it.price)}
+                  {it.cell ? `${it.cell} · ` : ''}{num(it.qty)} {it.unit} × {money(it.price)}
                 </Text>
               </View>
               <Text className="text-ink font-semibold">{money(it.qty * it.price)}</Text>
@@ -110,6 +133,32 @@ export default function OrderDetail() {
             <Text className="text-ink text-lg font-bold">{money(order.total)}</Text>
           </View>
         </Card>
+
+        {/* Маршрут сборки по складу (для склада/менеджера) */}
+        {canPick && pick.cells.length > 0 && (
+          <>
+            <View className="flex-row items-center mb-2 px-1">
+              <RouteIcon size={16} color={C.brand} />
+              <Text className="text-ink font-semibold ml-2">Маршрут сборки</Text>
+              <Text className="text-muted text-[12px] ml-auto">~{pick.distance} м</Text>
+            </View>
+            <Card className="p-3 mb-3">
+              <View className="mb-3">
+                <WarehouseMap cells={cells} products={products} highlight={pick.cells} />
+              </View>
+              {pick.order.map((c, i) => (
+                <View key={i} className={`flex-row items-center py-2 ${i > 0 ? 'border-t border-line' : ''}`}>
+                  <View className="h-6 w-6 rounded-full bg-brand items-center justify-center mr-3">
+                    <Text className="text-white text-[11px] font-bold">{i + 1}</Text>
+                  </View>
+                  <Badge color={C.brand}>{c.code}</Badge>
+                  <Text className="text-ink text-[13px] ml-2 flex-1" numberOfLines={1}>{c.name}</Text>
+                  <Text className="text-muted text-[12px]">{num(c.qty)} {c.unit}</Text>
+                </View>
+              ))}
+            </Card>
+          </>
+        )}
       </ScrollView>
     </Screen>
   )

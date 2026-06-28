@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { View, Text, ScrollView, Pressable } from 'react-native'
 import { router } from 'expo-router'
-import { ChevronRight, Flag, ScanLine } from 'lucide-react-native'
+import { ChevronRight, Flag, Plus } from 'lucide-react-native'
 import { useStore } from '../../store/useStore'
 import { Screen, Card, Badge, Empty, C, tone } from '../../components/ui'
 import { money } from '../../lib/format'
@@ -97,12 +97,12 @@ export default function Orders() {
       {/* Касса — быстрая продажа (не для курьера) */}
       {!isCourier && (
         <Pressable
-          onPress={() => router.push('/pos')}
+          onPress={() => router.push('/order-new')}
           className="absolute bottom-5 right-5 h-14 px-5 rounded-2xl bg-brand flex-row items-center active:opacity-80"
           style={{ shadowColor: C.brand, shadowOpacity: 0.4, shadowRadius: 12, elevation: 6 }}
         >
-          <ScanLine size={20} color="#fff" />
-          <Text className="text-white font-semibold ml-2">Касса</Text>
+          <Plus size={20} color="#fff" strokeWidth={2.4} />
+          <Text className="text-white font-semibold ml-2">Новый заказ</Text>
         </Pressable>
       )}
     </Screen>

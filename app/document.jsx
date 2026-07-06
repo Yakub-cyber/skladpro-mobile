@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { View, Text, ScrollView, Pressable, Alert } from 'react-native'
 import { useLocalSearchParams, router } from 'expo-router'
-import { ChevronLeft, Search, Plus, Minus, Check } from 'lucide-react-native'
+import { ChevronLeft, Search, Plus, Minus, Check, FileEdit } from 'lucide-react-native'
 import { useStore } from '../store/useStore'
 import { Screen, Input, Btn, Empty, C } from '../components/ui'
 import { num, money } from '../lib/format'
@@ -12,6 +12,7 @@ const TYPES = {
   writeoff: { title: 'Списание', verb: 'Списать', color: C.bad },
   sale_return: { title: 'Возврат продажи', verb: 'Принять возврат', color: C.info },
   purchase_return: { title: 'Возврат поставщику', verb: 'Оформить возврат', color: C.warn },
+  transfer: { title: 'Перемещение', verb: 'Переместить', color: C.info, transfer: true },
   inventory: { title: 'Инвентаризация', verb: 'Применить пересчёт', color: C.brand, count: true },
 }
 
@@ -20,41 +21,39 @@ export default function DocumentScreen() {
   const type = TYPES[params.type] ? params.type : 'purchase'
   const t = TYPES[type]
   const products = useStore((s) => s.products)
-  const receiveOp = useStore((s) => s.receiveOp)
-  const writeOff = useStore((s) => s.writeOff)
-  const returnStock = useStore((s) => s.returnStock)
-  const applyInventory = useStore((s) => s.applyInventory)
+  const warehouses = useStore((s) => s.warehouses) || []
+  const addDocument = useStore((s) => s.addDocument)
 
   const [q, setQ] = useState('')
   const [qty, setQty] = useState({}) // productId -> число
+  const [toWh, setToWh] = useState(warehouses[0]?.id || '')
 
   const list = useMemo(() => {
     const s = q.trim().toLowerCase()
     return products.filter((p) => !s || p.name.toLowerCase().includes(s) || (p.sku || '').toLowerCase().includes(s))
   }, [products, q])
 
+  const whName = (id) => warehouses.find((w) => w.id === id)?.name || '—'
   const setVal = (id, v) => setQty((m) => { const x = { ...m }; if (v <= 0 && !t.count) delete x[id]; else x[id] = v; return x })
   const add = (p) => setVal(p.id, (qty[p.id] ?? (t.count ? p.stock : 0)) + 1)
   const dec = (p) => setVal(p.id, Math.max(0, (qty[p.id] ?? (t.count ? p.stock : 0)) - 1))
 
   const picked = Object.keys(qty).length
-  const apply = () => {
+  const apply = (post = true) => {
     const entries = Object.entries(qty)
     if (!entries.length) return
-    if (type === 'purchase') {
-      receiveOp(entries.map(([id, n]) => { const p = products.find((x) => x.id === id); return { productId: id, name: p.name, qty: n } }), 'Закупка (моб.)')
-    } else if (type === 'writeoff') {
-      entries.forEach(([id, n]) => writeOff(id, n, 'Списание (моб.)'))
-    } else if (type === 'sale_return') {
-      entries.forEach(([id, n]) => returnStock(id, n, 'Возврат продажи'))
-    } else if (type === 'purchase_return') {
-      entries.forEach(([id, n]) => writeOff(id, n, 'Возврат поставщику'))
-    } else if (type === 'inventory') {
-      const counts = {}
-      entries.forEach(([id, n]) => { counts[id] = n })
-      applyInventory(counts)
-    }
-    Alert.alert('Готово', `${t.title}: ${picked} позиций`, [{ text: 'OK', onPress: () => router.back() }])
+    const docType = type === 'purchase_return' ? 'supplier_return' : type
+    const items = entries.map(([id, n]) => {
+      const p = products.find((x) => x.id === id)
+      const it = { productId: id, name: p.name, unit: p.unit, qty: n }
+      if (type === 'transfer') it.fromWh = p.warehouseId
+      if (type === 'inventory') it.prevStock = p.stock
+      return it
+    })
+    const doc = { type: docType, items, reason: t.title }
+    if (type === 'transfer') doc.toWarehouseId = toWh
+    addDocument(doc, { post })
+    Alert.alert('Готово', `${t.title}: ${picked} поз. ${post ? 'проведено' : '— черновик'}`, [{ text: 'OK', onPress: () => router.back() }])
   }
 
   return (
@@ -72,6 +71,21 @@ export default function DocumentScreen() {
           <Input value={q} onChangeText={setQ} placeholder="Поиск товара…" className="flex-1 h-11 px-2 bg-transparent border-0" />
         </View>
         {t.count && <Text className="text-muted text-[12px] mt-2">Укажите фактический остаток по каждой позиции</Text>}
+        {t.transfer && (
+          <View className="mt-3">
+            <Text className="text-muted text-[12px] mb-1.5">Склад назначения</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+              {warehouses.map((w) => {
+                const on = toWh === w.id
+                return (
+                  <Pressable key={w.id} onPress={() => setToWh(w.id)} className="px-3.5 h-9 rounded-full items-center justify-center" style={{ backgroundColor: on ? t.color : C.surface2, borderWidth: 1, borderColor: on ? t.color : C.line }}>
+                    <Text className="text-[13px] font-medium" style={{ color: on ? '#fff' : C.muted }}>{w.name}</Text>
+                  </Pressable>
+                )
+              })}
+            </ScrollView>
+          </View>
+        )}
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: picked ? 100 : 24 }}>
@@ -85,7 +99,7 @@ export default function DocumentScreen() {
               <View className="w-1 h-9 rounded mr-3" style={{ backgroundColor: ci.color }} />
               <View className="flex-1 pr-2">
                 <Text className="text-ink text-[14px]" numberOfLines={1}>{p.name}</Text>
-                <Text className="text-muted text-[12px] mt-0.5">{t.count ? `на складе ${num(p.stock)} ${p.unit}` : `${num(p.stock)} ${p.unit} · ${money(p.price)}`}</Text>
+                <Text className="text-muted text-[12px] mt-0.5">{t.count ? `на складе ${num(p.stock)} ${p.unit}` : t.transfer ? `${num(p.stock)} ${p.unit} · из «${whName(p.warehouseId)}»` : `${num(p.stock)} ${p.unit} · ${money(p.price)}`}</Text>
               </View>
               {has || t.count ? (
                 <View className="flex-row items-center">
@@ -109,7 +123,13 @@ export default function DocumentScreen() {
 
       {picked > 0 && (
         <View className="absolute bottom-0 left-0 right-0 bg-surface border-t border-line px-4 pt-3 pb-7">
-          <Btn title={`${t.verb} · ${picked} поз.`} icon={Check} size="lg" onPress={apply} style={{ backgroundColor: t.color }} />
+          {t.transfer && (
+            <Text className="text-muted text-[12px] mb-2 text-center">Переместить на склад «{whName(toWh)}»</Text>
+          )}
+          <View className="flex-row gap-2">
+            <Btn title="Черновик" variant="soft" icon={FileEdit} size="lg" disabled={t.transfer && !toWh} onPress={() => apply(false)} className="flex-1" />
+            <Btn title={`${t.verb} · ${picked}`} icon={Check} size="lg" disabled={t.transfer && !toWh} onPress={() => apply(true)} className="flex-1" />
+          </View>
         </View>
       )}
     </Screen>

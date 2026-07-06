@@ -46,3 +46,10 @@ yarn-error.*
 # Сборка
 *.apk
 build-log*.txt
+build-apk*.txt
+
+# IDE
+.idea/
+
+# Внутренний бэклог (инфра-ссылки, не для публичного репо)
+ROADMAP.md

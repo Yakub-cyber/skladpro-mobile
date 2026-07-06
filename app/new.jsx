@@ -3,6 +3,7 @@ import { router } from 'expo-router'
 import {
   X, ScanLine, ClipboardList, Navigation, Package, UserSquare2, ChevronRight,
   Sparkles, Warehouse, Store, Plus, ArrowDownToLine, ArrowUpFromLine, ClipboardCheck, Undo2,
+  ArrowLeftRight, Truck,
 } from 'lucide-react-native'
 import { useStore } from '../store/useStore'
 import { Screen, C } from '../components/ui'
@@ -16,7 +17,8 @@ const OPS = [
   { perm: 'operations', label: 'Закупка / приход', sub: 'Оприходовать товар', icon: ArrowDownToLine, to: '/document?type=purchase', color: C.ok, g: 'Документы' },
   { perm: 'operations', label: 'Списание', sub: 'Брак, недостача, порча', icon: ArrowUpFromLine, to: '/document?type=writeoff', color: C.bad, g: 'Документы' },
   { perm: 'operations', label: 'Возврат продажи', sub: 'Товар от клиента на склад', icon: Undo2, to: '/document?type=sale_return', color: C.info, g: 'Документы' },
-  { perm: 'operations', label: 'Возврат поставщику', sub: 'Вернуть закупленное', icon: Undo2, to: '/document?type=purchase_return', color: C.warn, g: 'Документы' },
+  { perm: 'operations', label: 'Возврат поставщику', sub: 'Вернуть закупленное', icon: Truck, to: '/document?type=purchase_return', color: C.warn, g: 'Документы' },
+  { perm: 'operations', label: 'Перемещение', sub: 'Между складами', icon: ArrowLeftRight, to: '/document?type=transfer', color: C.info, g: 'Документы' },
   { perm: 'operations', label: 'Инвентаризация', sub: 'Пересчёт остатков', icon: ClipboardCheck, to: '/document?type=inventory', color: C.brand, g: 'Документы' },
   // Разделы (переход)
   { perm: 'delivery', label: 'Доставка', sub: 'Маршрут и карта', icon: Navigation, to: '/delivery', color: C.warn, g: 'Разделы' },

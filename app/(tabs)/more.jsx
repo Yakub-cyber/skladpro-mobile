@@ -50,7 +50,7 @@ export default function More() {
         {(() => {
           const sections = [
             { perm: 'customers', icon: UserSquare2, label: 'Клиенты и долги', to: '/customers' },
-            { perm: 'orders', icon: History, label: 'История', to: '/history' },
+            { perm: 'orders', icon: History, label: 'Документы и история', to: '/history' },
             { perm: 'analytics', icon: BarChart3, label: 'Аналитика', to: '/analytics' },
           ].filter((s) => canAccess(me?.role, s.perm))
           if (!sections.length) return null

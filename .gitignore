@@ -43,6 +43,9 @@ yarn-error.*
 # Локальные переменные окружения (ключи)
 .env
 
+# Firebase (содержит api_key — не в публичный репо)
+google-services.json
+
 # Сборка
 *.apk
 build-log*.txt

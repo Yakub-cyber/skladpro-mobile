@@ -14,6 +14,7 @@
     },
     "android": {
       "package": "ru.skladpro.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#6366F1",
         "foregroundImage": "./assets/android-icon-foreground.png",

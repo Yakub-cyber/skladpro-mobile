@@ -4,19 +4,25 @@
 Чтобы уведомления приходили на **полностью закрытое** приложение, нужен Firebase.
 Весь код уже готов — ниже только твои действия.
 
+**Статус (обновлено 2026-07-14):**
+- [x] `google-services.json` подключён в проекте (`app.json` → `android.googleServicesFile`).
+- [x] Edge Function `supabase/functions/send-push/index.ts` написана.
+- [x] SQL для таблицы токенов (`push_tokens.sql`).
+- [ ] Firebase-проект создан и `google-services.json` от него положен в корень.
+- [ ] Secret `FCM_SERVICE_ACCOUNT` добавлен в Supabase.
+- [ ] Edge Function задеплоена.
+- [ ] Database Webhook на `orders` настроен.
+
 ## 1. Firebase-проект (бесплатно)
 1. Зайди на https://console.firebase.google.com → **Создать проект** (любое имя, напр. «SkladPro»).
 2. Внутри проекта: **Add app → Android**.
    - **Android package name:** `ru.skladpro.app` (точно так).
    - Скачай **`google-services.json`**.
-3. Положи `google-services.json` в корень `E:\Cloude\skladpro-mobile\`.
+3. Замени файл в корне `D:\Claude\skladpro-mobile\google-services.json` на свежий из Firebase.
+   Файл в `.gitignore` — в репо не попадёт.
 
 ## 2. Подключить файл в проекте
-В `app.json`, в блок `"android"`, добавь строку:
-```json
-"googleServicesFile": "./google-services.json",
-```
-(рядом с `"package": "ru.skladpro.app"`).
+Уже сделано: в `app.json` → `android.googleServicesFile = "./google-services.json"`.
 
 ## 3. Service account для отправки
 1. Firebase Console → ⚙️ **Project settings → Service accounts**.
@@ -45,13 +51,23 @@ Supabase → **Database → Webhooks → Create**:
 - Заголовок: `Authorization: Bearer <SERVICE_ROLE_KEY>` (или включи «service role»)
 
 ## 7. Пересборка APK
-После того как `google-services.json` лежит и `app.json` обновлён — пересобрать:
+После того как `google-services.json` лежит и `app.json` обновлён — пересобрать.
+
+**Рекомендуемый путь — EAS Build** (не трогает `android/`, keystore хранит облако Expo):
 ```
-npx expo prebuild -p android --clean
-# восстановить правки android/ (splits, JDK, sdk.dir — см. память проекта)
-cd android && ./gradlew.bat assembleRelease
+eas build --profile production --platform android
 ```
-(или скажи мне «пересобери push» — соберу сам.)
+
+Локальная сборка (если не хочется EAS):
+```
+# ВНИМАНИЕ: --clean затрёт правки android/app/build.gradle (release signingConfig)
+# и AndroidManifest.xml (blockedPermissions). Если signing и permissions уже настроены
+# локально (см. android/SIGNING.md) — --clean НЕ запускать.
+npx expo prebuild -p android
+cd android && ./gradlew.bat bundleRelease
+```
+
+**Внимание:** для релиза в Play Store сборка должна быть подписана upload keystore — см. `android/SIGNING.md`. Debug-подпись Play отклонит.
 
 ## Готово
 После этого: новый заказ → push менеджеру/админу; назначение заказа курьеру →

@@ -13,10 +13,16 @@ expo-env.d.ts
 .kotlin/
 *.orig.*
 *.jks
+*.keystore
 *.p8
 *.p12
 *.key
 *.mobileprovision
+
+# Android release signing (пароли и путь к keystore — только локально)
+android/key.properties
+android/app/upload-keystore.jks
+android/app/release.keystore
 
 # Metro
 .metro-health-check*

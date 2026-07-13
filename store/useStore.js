@@ -5,12 +5,15 @@ import { makeSeed } from './seed'
 import { uid, docNo } from '../lib/id'
 import { nextStatus, statusInfo, docTypeInfo } from '../lib/constants'
 import { hasSupabase } from '../lib/supabase'
+import { applyDocToState } from '../lib/docEngine'
 import {
   cloudLoadAll,
+  cloudLoadMerged,
   cloudSeed,
   cloudUpsert,
   remapSeedForCompany,
   attachSync,
+  initOutboxSync,
   getCloudSession,
   onAuthChange,
   cloudSignIn,
@@ -30,44 +33,8 @@ import { initPush, notify, getDeviceToken } from '../lib/push'
 // Чтобы переключиться на реальный API/Supabase, эти actions заменяются
 // на сетевые вызовы — компоненты менять не нужно.
 
-// ── Движок проводки документов ─────────────────────────────────────────────
-// Тип движения и знак влияния на остаток при проводке (post).
-const POST_MV = { purchase: 'in', sale_return: 'return', writeoff: 'writeoff', supplier_return: 'supplier_return', sale: 'writeoff' }
-const POST_SIGN = { purchase: 1, sale_return: 1, writeoff: -1, supplier_return: -1, sale: -1 }
-
-// Применить документ к остаткам и журналу движений. dir=1 — провести, -1 — откатить.
-// Возвращает part state ({ products, movements }) для set().
-function applyDocToState(state, doc, dir, by) {
-  const at = new Date().toISOString()
-  const moves = []
-  let products = state.products
-  const setP = (id, fn) => { products = products.map((p) => (p.id === id ? fn(p) : p)) }
-  const reason = dir < 0 ? `Отмена · ${doc.no}` : (doc.reason || docTypeInfo(doc.type).label)
-
-  if (doc.type === 'transfer') {
-    for (const it of doc.items) {
-      const to = dir > 0 ? doc.toWarehouseId : it.fromWh
-      setP(it.productId, (p) => ({ ...p, warehouseId: to || p.warehouseId }))
-      moves.push({ id: uid('mv'), type: 'transfer', productId: it.productId, name: it.name, qty: it.qty, delta: 0, reason, by, at })
-    }
-  } else if (doc.type === 'inventory') {
-    for (const it of doc.items) {
-      const target = dir > 0 ? it.qty : it.prevStock
-      let delta = 0
-      setP(it.productId, (p) => { delta = target - p.stock; return { ...p, stock: Math.max(0, target) } })
-      if (delta !== 0) moves.push({ id: uid('mv'), type: 'inventory', productId: it.productId, name: it.name, qty: Math.abs(delta), delta, reason: dir < 0 ? reason : (delta > 0 ? 'Излишек' : 'Недостача'), by, at })
-    }
-  } else {
-    const sign = (POST_SIGN[doc.type] ?? -1) * dir
-    const mvType = POST_MV[doc.type] || 'writeoff'
-    for (const it of doc.items) {
-      const d = sign * it.qty
-      setP(it.productId, (p) => ({ ...p, stock: Math.max(0, p.stock + d) }))
-      moves.push({ id: uid('mv'), type: mvType, productId: it.productId, name: it.name, qty: it.qty, delta: d, reason, by, at })
-    }
-  }
-  return { products, movements: [...moves, ...state.movements] }
-}
+// Движок проводки документов вынесен в lib/docEngine.js — там же его тесты
+// (lib/docEngine.test.js). Импорт выше.
 
 export const useStore = create(
   persist(
@@ -145,7 +112,10 @@ export const useStore = create(
             return
           }
           const companyId = membership.company_id
-          let data = await cloudLoadAll()
+          // cloudLoadMerged сначала дошлёт локальную очередь и наложит
+          // pending поверх серверных данных — иначе bootstrap затирает
+          // офлайн-правки, сделанные до логина/перезапуска.
+          let data = await cloudLoadMerged()
           if (!data) {
             const seed = remapSeedForCompany(makeSeed(), companyId)
             await cloudSeed(seed, companyId)
@@ -182,6 +152,10 @@ export const useStore = create(
             needOnboarding: false,
             cloudError: null,
           })
+          // Сначала поднимаем outbox: восстанавливаем очередь из AsyncStorage
+          // и запускаем flush. attachSync после — свежие правки уходят
+          // тем же путём. initOutboxSync идемпотентен.
+          initOutboxSync().catch((e) => console.warn('outbox init:', e?.message || e))
           attachSync(useStore)
           // Уведомления: realtime-подписка на заказы компании
           initPush()

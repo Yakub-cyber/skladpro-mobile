@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react'
-import { View, Text, ScrollView, Pressable } from 'react-native'
+import { useState, useMemo, useCallback } from 'react'
+import { View, Text, ScrollView, Pressable, FlatList } from 'react-native'
 import { router } from 'expo-router'
 import { Search, ChevronRight, Wrench, Hammer, Zap, Droplets, PaintBucket, Package } from 'lucide-react-native'
 import { useStore } from '../../store/useStore'
-import { Screen, Card, Input, Badge, Empty, C } from '../../components/ui'
+import { Screen, Input, Empty, C } from '../../components/ui'
 import { money, num } from '../../lib/format'
 import { CATEGORIES, catInfo } from '../../lib/constants'
 import { reservedByProduct } from '../../lib/orders'
@@ -30,8 +30,10 @@ export default function Products() {
   const totalValue = products.reduce((a, p) => a + p.stock * p.cost, 0)
   const chips = [{ key: 'all', name: 'Все', color: C.brand }, ...CATEGORIES.map((c) => ({ key: c.key, name: c.key, color: c.color }))]
 
-  return (
-    <Screen>
+  // Заголовок вынесен в ListHeaderComponent, чтобы поиск и чипы прокручивались
+  // вместе со списком (а не «прилипали» сверху при виртуализации FlatList).
+  const Header = (
+    <View>
       <View className="px-4 pt-3 pb-1">
         <Text className="text-ink text-xl font-bold">Товары</Text>
         <Text className="text-muted text-[13px] mb-3">{products.length} SKU · склад на {money(totalValue)}</Text>
@@ -40,8 +42,6 @@ export default function Products() {
           <Input value={q} onChangeText={setQ} placeholder="Поиск по названию, артикулу…" className="flex-1 h-11 px-2 bg-transparent border-0" />
         </View>
       </View>
-
-      {/* Категории */}
       <View className="h-12">
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, alignItems: 'center' }}>
           {chips.map((c) => {
@@ -60,42 +60,63 @@ export default function Products() {
           })}
         </ScrollView>
       </View>
+      {/* Обёртка карточки списка — рисуем скруглённый верх, а низ закроет footer. */}
+      <View className="mx-4 mt-2 bg-surface border border-line rounded-t-2xl overflow-hidden" style={{ height: 1, marginBottom: -1 }} />
+    </View>
+  )
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 8, paddingBottom: 24 }}>
-        {list.length === 0 && <Empty title="Ничего не найдено" icon={Search} />}
-        <Card className="overflow-hidden">
-          {list.map((p, i) => {
-            const ci = catInfo(p.category)
-            const Icon = CAT_ICON[ci.icon] || Package
-            const stColor = stockTone(p)
-            return (
-              <Pressable
-                key={p.id}
-                onPress={() => router.push(`/product/${p.id}`)}
-                className={`flex-row items-center px-3.5 py-3 active:bg-surface-2 ${i > 0 ? 'border-t border-line' : ''}`}
-              >
-                <View className="h-9 w-9 rounded-lg items-center justify-center" style={{ backgroundColor: ci.color + '22' }}>
-                  <Icon size={17} color={ci.color} />
-                </View>
-                <View className="flex-1 ml-3 pr-2">
-                  <Text className="text-ink font-medium text-[14px]" numberOfLines={1}>{p.name}</Text>
-                  <Text className="text-muted text-[12px] mt-0.5">{p.sku}</Text>
-                </View>
-                <View className="items-end mr-1.5">
-                  <Text className="text-ink text-[14px] font-medium">{money(p.price)}</Text>
-                  <Text className="text-[12px] font-medium" style={{ color: stColor }}>{num(p.stock)} {p.unit}</Text>
-                  {reserved[p.id] > 0 && (
-                    <Text className="text-[11px] text-warn mt-0.5" numberOfLines={1}>
-                      резерв {num(reserved[p.id])} · дост. {num(p.stock - reserved[p.id])}
-                    </Text>
-                  )}
-                </View>
-                <ChevronRight size={16} color={C.muted} />
-              </Pressable>
-            )
-          })}
-        </Card>
-      </ScrollView>
+  const Footer = (
+    <View className="mx-4 mb-6 bg-surface border-x border-b border-line rounded-b-2xl" style={{ height: 8 }} />
+  )
+
+  // Вынесенный renderItem — стабильная ссылка + мемоизация ускоряют FlatList
+  // на больших каталогах (без пересоздания функции на каждый ререндер).
+  const renderRow = useCallback(({ item: p, index }) => {
+    const ci = catInfo(p.category)
+    const Icon = CAT_ICON[ci.icon] || Package
+    const stColor = stockTone(p)
+    return (
+      <Pressable
+        onPress={() => router.push(`/product/${p.id}`)}
+        className={`mx-4 bg-surface border-x border-line flex-row items-center px-3.5 py-3 active:bg-surface-2 ${index > 0 ? 'border-t' : ''}`}
+      >
+        <View className="h-9 w-9 rounded-lg items-center justify-center" style={{ backgroundColor: ci.color + '22' }}>
+          <Icon size={17} color={ci.color} />
+        </View>
+        <View className="flex-1 ml-3 pr-2">
+          <Text className="text-ink font-medium text-[14px]" numberOfLines={1}>{p.name}</Text>
+          <Text className="text-muted text-[12px] mt-0.5">{p.sku}</Text>
+        </View>
+        <View className="items-end mr-1.5">
+          <Text className="text-ink text-[14px] font-medium">{money(p.price)}</Text>
+          <Text className="text-[12px] font-medium" style={{ color: stColor }}>{num(p.stock)} {p.unit}</Text>
+          {reserved[p.id] > 0 && (
+            <Text className="text-[11px] text-warn mt-0.5" numberOfLines={1}>
+              резерв {num(reserved[p.id])} · дост. {num(p.stock - reserved[p.id])}
+            </Text>
+          )}
+        </View>
+        <ChevronRight size={16} color={C.muted} />
+      </Pressable>
+    )
+  }, [reserved])
+
+  return (
+    <Screen>
+      <FlatList
+        data={list}
+        keyExtractor={(p) => p.id}
+        renderItem={renderRow}
+        ListHeaderComponent={Header}
+        ListFooterComponent={list.length > 0 ? Footer : null}
+        ListEmptyComponent={<View className="px-4 mt-8"><Empty title="Ничего не найдено" icon={Search} /></View>}
+        initialNumToRender={20}
+        windowSize={7}
+        maxToRenderPerBatch={20}
+        removeClippedSubviews
+        contentContainerStyle={{ paddingBottom: 24 }}
+        keyboardShouldPersistTaps="handled"
+      />
     </Screen>
   )
 }

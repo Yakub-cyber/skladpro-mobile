@@ -42,7 +42,12 @@ export default function Dashboard() {
     return { active, revenue, low, avg, top, maxQ: top[0]?.q || 1 }
   }, [products, orders])
 
-  const chart = useMemo(() => buildSeries(period, orders), [period, orders])
+  // costMap нужен buildSeries для расчёта cost/profit в totals.
+  const costMap = useMemo(
+    () => Object.fromEntries(products.map((p) => [p.id, Number(p.cost) || 0])),
+    [products],
+  )
+  const chart = useMemo(() => buildSeries(period, orders, costMap), [period, orders, costMap])
   const stockValue = products.reduce((a, p) => a + p.stock * p.cost, 0)
   const debt = customers.reduce((a, c) => a + Math.max(0, c.balance || 0), 0)
   const recent = [...orders].sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1)).slice(0, 6)
@@ -90,6 +95,18 @@ export default function Dashboard() {
             </ScrollView>
           </View>
           <AreaChart series={chart.series} height={200} />
+          {/* Мини-статы под графиком: себест/прибыль/средний чек по периоду. */}
+          {chart.totals && (
+            <View className="flex-row mt-3 pt-3 border-t border-line">
+              <MiniStat label="Себест." value={money(chart.totals.cost)} />
+              <MiniStat
+                label="Прибыль"
+                value={money(chart.totals.profit)}
+                color={chart.totals.profit >= 0 ? C.ok : C.bad}
+              />
+              <MiniStat label="Средний чек" value={money(chart.totals.avg)} last />
+            </View>
+          )}
         </Section>
 
         {/* Топ продаж */}
@@ -144,5 +161,14 @@ export default function Dashboard() {
         </Section>
       </ScrollView>
     </Screen>
+  )
+}
+
+function MiniStat({ label, value, color, last }) {
+  return (
+    <View className={`flex-1 ${last ? '' : 'border-r border-line'} px-2`}>
+      <Text className="text-muted text-[11px]" numberOfLines={1}>{label}</Text>
+      <Text className="text-[14px] font-semibold mt-0.5" style={{ color: color || C.ink }} numberOfLines={1}>{value}</Text>
+    </View>
   )
 }

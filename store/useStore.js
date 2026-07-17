@@ -684,6 +684,38 @@ export const useStore = create(
         const nx = o && nextStatus(o.status)
         if (nx) get().setOrderStatus(id, nx)
       },
+      // Редактирование заказа до отгрузки. Патч должен уже содержать
+      // пересчитанный total (UI считает subtotal + скидку). Корректируем
+      // баланс клиента на дельту долга (если onCredit меняется — учитываем
+      // разницу; если сумма выросла — долг растёт, если упала — уменьшается).
+      // Возвращает { ok, error? } — вызывающий покажет ошибку.
+      updateOrder: (id, patch) => {
+        const o = get().orders.find((x) => x.id === id)
+        if (!o) return { ok: false, error: 'Заказ не найден' }
+        if (o.stockConsumed || o.status === 'cancelled') {
+          return { ok: false, error: 'Заказ уже отгружен или отменён — редактирование недоступно' }
+        }
+        set((s) => {
+          const next = { ...o, ...patch }
+          const oldDebt = o.onCredit ? o.total || 0 : 0
+          const newDebt = next.onCredit ? next.total || 0 : 0
+          const debtDelta = newDebt - oldDebt
+          let customers = s.customers
+          if (debtDelta !== 0 && next.customerId) {
+            customers = s.customers.map((c) =>
+              c.id === next.customerId
+                ? { ...c, balance: Math.max(0, (c.balance || 0) + debtDelta) }
+                : c,
+            )
+          }
+          return {
+            orders: s.orders.map((x) => (x.id === id ? next : x)),
+            customers,
+          }
+        })
+        get().logAction(`Заказ ${o.no} изменён`, { section: 'Заказы', type: 'update' })
+        return { ok: true }
+      },
       cancelOrder: (id) => {
         const o = get().orders.find((x) => x.id === id)
         set((s) => ({

@@ -1,12 +1,13 @@
 import { useState, useMemo, useCallback } from 'react'
 import { View, Text, ScrollView, Pressable, FlatList } from 'react-native'
 import { router } from 'expo-router'
-import { Search, ChevronRight, Wrench, Hammer, Zap, Droplets, PaintBucket, Package } from 'lucide-react-native'
+import { Search, ChevronRight, Wrench, Hammer, Zap, Droplets, PaintBucket, Package, SlidersHorizontal } from 'lucide-react-native'
 import { useStore } from '../../store/useStore'
 import { Screen, Input, Empty, C } from '../../components/ui'
 import { money, num } from '../../lib/format'
 import { CATEGORIES, catInfo } from '../../lib/constants'
 import { reservedByProduct } from '../../lib/orders'
+import FiltersSheet, { EMPTY_FILTERS, activeFiltersCount, applyProductFilters } from '../../components/FiltersSheet'
 
 const CAT_ICON = { Wrench, Hammer, Zap, Droplets, PaintBucket, Package }
 const stockTone = (p) => (p.stock <= p.minStock ? C.bad : p.stock <= p.minStock * 1.5 ? C.warn : C.ok)
@@ -17,15 +18,21 @@ export default function Products() {
   const reserved = useMemo(() => reservedByProduct(orders), [orders])
   const [q, setQ] = useState('')
   const [cat, setCat] = useState('all')
+  const [filters, setFilters] = useState(EMPTY_FILTERS)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const filterCount = activeFiltersCount(filters)
 
   const list = useMemo(() => {
     const s = q.trim().toLowerCase()
-    return products.filter(
+    // Порядок: категория/текст (дёшево, фильтрует основную массу) →
+    // числовые фильтры (диапазоны цены/остатка/признаков).
+    const base = products.filter(
       (p) =>
         (cat === 'all' || p.category === cat) &&
         (!s || p.name.toLowerCase().includes(s) || (p.sku || '').toLowerCase().includes(s)),
     )
-  }, [products, q, cat])
+    return filterCount ? applyProductFilters(base, filters) : base
+  }, [products, q, cat, filters, filterCount])
 
   const totalValue = products.reduce((a, p) => a + p.stock * p.cost, 0)
   const chips = [{ key: 'all', name: 'Все', color: C.brand }, ...CATEGORIES.map((c) => ({ key: c.key, name: c.key, color: c.color }))]
@@ -37,9 +44,23 @@ export default function Products() {
       <View className="px-4 pt-3 pb-1">
         <Text className="text-ink text-xl font-bold">Товары</Text>
         <Text className="text-muted text-[13px] mb-3">{products.length} SKU · склад на {money(totalValue)}</Text>
-        <View className="flex-row items-center bg-surface-2 rounded-xl border border-line px-3 h-11">
-          <Search size={16} color={C.muted} />
-          <Input value={q} onChangeText={setQ} placeholder="Поиск по названию, артикулу…" className="flex-1 h-11 px-2 bg-transparent border-0" />
+        <View className="flex-row items-center gap-2">
+          <View className="flex-1 flex-row items-center bg-surface-2 rounded-xl border border-line px-3 h-11">
+            <Search size={16} color={C.muted} />
+            <Input value={q} onChangeText={setQ} placeholder="Поиск по названию, артикулу…" className="flex-1 h-11 px-2 bg-transparent border-0" />
+          </View>
+          <Pressable
+            onPress={() => setFiltersOpen(true)}
+            className="h-11 px-3 rounded-xl bg-surface-2 border border-line flex-row items-center active:opacity-80"
+            style={filterCount > 0 ? { borderColor: C.brand } : undefined}
+          >
+            <SlidersHorizontal size={16} color={filterCount > 0 ? C.brand : C.muted} />
+            {filterCount > 0 && (
+              <View className="ml-1.5 h-5 min-w-5 px-1 rounded-full items-center justify-center" style={{ backgroundColor: C.brand }}>
+                <Text className="text-white text-[11px] font-bold">{filterCount}</Text>
+              </View>
+            )}
+          </Pressable>
         </View>
       </View>
       <View className="h-12">
@@ -116,6 +137,12 @@ export default function Products() {
         removeClippedSubviews
         contentContainerStyle={{ paddingBottom: 24 }}
         keyboardShouldPersistTaps="handled"
+      />
+      <FiltersSheet
+        visible={filtersOpen}
+        value={filters}
+        onApply={setFilters}
+        onClose={() => setFiltersOpen(false)}
       />
     </Screen>
   )

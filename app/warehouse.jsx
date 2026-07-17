@@ -10,6 +10,7 @@ import { money, num } from '../lib/format'
 export default function Warehouse() {
   const cells = useStore((s) => s.cells)
   const products = useStore((s) => s.products)
+  const activeWh = useStore((s) => s.warehouses?.find((w) => w.id === s.activeWarehouseId))
   const [q, setQ] = useState('')
   const [sel, setSel] = useState(null) // выбранная ячейка
 
@@ -50,6 +51,7 @@ export default function Warehouse() {
               highlight={highlight}
               selected={sel?.id}
               onCellPress={(c) => setSel(c)}
+              workZones={activeWh?.workZones}
             />
           </View>
         </ScrollView>

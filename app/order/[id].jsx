@@ -1,9 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { View, Text, ScrollView, Pressable } from 'react-native'
 import { useLocalSearchParams, router } from 'expo-router'
-import { ChevronLeft, ChevronRight, MapPin, Truck, Check, X, Flag, Route as RouteIcon } from 'lucide-react-native'
+import { ChevronLeft, ChevronRight, MapPin, Truck, Check, X, Flag, Pencil, Route as RouteIcon } from 'lucide-react-native'
 import { useStore } from '../../store/useStore'
 import { WarehouseMap } from '../../components/WarehouseMap'
+import EditOrderModal from '../../components/EditOrderModal'
 import { Screen, Card, Badge, Empty, Btn, C, tone } from '../../components/ui'
 import { money, num, dateTime } from '../../lib/format'
 import { statusInfo, nextStatus, TRACK_FLOW, canAccess, roleInfo } from '../../lib/constants'
@@ -18,6 +19,8 @@ export default function OrderDetail() {
   const authUserId = useStore((s) => s.authUserId)
   const advanceOrder = useStore((s) => s.advanceOrder)
   const cancelOrder = useStore((s) => s.cancelOrder)
+  const updateOrder = useStore((s) => s.updateOrder)
+  const [editOpen, setEditOpen] = useState(false)
 
   const me = employees.find((e) => e.id === authUserId)
   const canPick = canAccess(me?.role, 'warehouse')
@@ -48,6 +51,8 @@ export default function OrderDetail() {
   const nx = nextStatus(order.status)
   const nxInfo = nx && statusInfo(nx)
   const cancelled = order.status === 'cancelled'
+  // Правка возможна пока заказ не отгружен и не отменён (см. гард в updateOrder).
+  const canEdit = !order.stockConsumed && !cancelled
 
   return (
     <Screen>
@@ -96,6 +101,9 @@ export default function OrderDetail() {
                 className="mb-2"
               />
             )}
+            {canEdit && (
+              <Btn title="Изменить заказ" variant="soft" icon={Pencil} onPress={() => setEditOpen(true)} className="mb-2" />
+            )}
             {order.status !== 'delivered' && (
               <Btn title="Отменить заказ" variant="soft" icon={X} onPress={() => cancelOrder(order.id)} />
             )}
@@ -133,6 +141,16 @@ export default function OrderDetail() {
             <Text className="text-ink text-lg font-bold">{money(order.total)}</Text>
           </View>
         </Card>
+
+        {/* EditOrderModal сам делает return null пока invisible — можно
+            монтировать без ленивого guard. onSave возвращает результат
+            updateOrder, чтобы модалка показала ошибку и не закрывалась. */}
+        <EditOrderModal
+          visible={editOpen}
+          order={order}
+          onClose={() => setEditOpen(false)}
+          onSave={(patch) => updateOrder(order.id, patch)}
+        />
 
         {/* Маршрут сборки по складу (для склада/менеджера) */}
         {canPick && pick.cells.length > 0 && (

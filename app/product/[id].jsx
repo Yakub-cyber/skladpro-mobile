@@ -6,14 +6,17 @@ import { useStore } from '../../store/useStore'
 import { Screen, Card, Badge, Empty, Btn, Input, Field, C } from '../../components/ui'
 import { money, num } from '../../lib/format'
 import { catInfo, canAccess } from '../../lib/constants'
+import { reservedByProduct } from '../../lib/orders'
 
 export default function ProductDetail() {
   const { id } = useLocalSearchParams()
   const product = useStore((s) => s.products.find((p) => p.id === id))
+  const orders = useStore((s) => s.orders)
   const receiveOp = useStore((s) => s.receiveOp)
   const writeOff = useStore((s) => s.writeOff)
   const me = useStore((s) => s.employees.find((e) => e.id === s.authUserId))
   const [op, setOp] = useState(null) // 'in' | 'out'
+  const reserved = product ? reservedByProduct(orders)[product.id] || 0 : 0
 
   const canOps = canAccess(me?.role, 'operations')
 
@@ -65,6 +68,11 @@ export default function ProductDetail() {
               {low && <AlertTriangle size={15} color={C.warn} />}
               <Text className={`text-lg font-bold ml-1 ${low ? 'text-warn' : 'text-ink'}`}>{num(product.stock)} {product.unit}</Text>
             </View>
+            {reserved > 0 && (
+              <Text className="text-[12px] text-warn mt-1">
+                резерв {num(reserved)} · дост. {num(product.stock - reserved)} {product.unit}
+              </Text>
+            )}
           </Card>
         </View>
 

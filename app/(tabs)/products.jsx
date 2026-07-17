@@ -6,12 +6,15 @@ import { useStore } from '../../store/useStore'
 import { Screen, Card, Input, Badge, Empty, C } from '../../components/ui'
 import { money, num } from '../../lib/format'
 import { CATEGORIES, catInfo } from '../../lib/constants'
+import { reservedByProduct } from '../../lib/orders'
 
 const CAT_ICON = { Wrench, Hammer, Zap, Droplets, PaintBucket, Package }
 const stockTone = (p) => (p.stock <= p.minStock ? C.bad : p.stock <= p.minStock * 1.5 ? C.warn : C.ok)
 
 export default function Products() {
   const products = useStore((s) => s.products)
+  const orders = useStore((s) => s.orders)
+  const reserved = useMemo(() => reservedByProduct(orders), [orders])
   const [q, setQ] = useState('')
   const [cat, setCat] = useState('all')
 
@@ -81,6 +84,11 @@ export default function Products() {
                 <View className="items-end mr-1.5">
                   <Text className="text-ink text-[14px] font-medium">{money(p.price)}</Text>
                   <Text className="text-[12px] font-medium" style={{ color: stColor }}>{num(p.stock)} {p.unit}</Text>
+                  {reserved[p.id] > 0 && (
+                    <Text className="text-[11px] text-warn mt-0.5" numberOfLines={1}>
+                      резерв {num(reserved[p.id])} · дост. {num(p.stock - reserved[p.id])}
+                    </Text>
+                  )}
                 </View>
                 <ChevronRight size={16} color={C.muted} />
               </Pressable>

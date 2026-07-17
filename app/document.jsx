@@ -52,7 +52,13 @@ export default function DocumentScreen() {
     })
     const doc = { type: docType, items, reason: t.title }
     if (type === 'transfer') doc.toWarehouseId = toWh
-    addDocument(doc, { post })
+    const r = addDocument(doc, { post })
+    // addDocument вернёт { ok:false, error } при попытке провести
+    // документ, требующий больше товара, чем есть на остатке.
+    if (r && typeof r === 'object' && r.ok === false) {
+      Alert.alert('Не хватает остатка', r.error)
+      return
+    }
     Alert.alert('Готово', `${t.title}: ${picked} поз. ${post ? 'проведено' : '— черновик'}`, [{ text: 'OK', onPress: () => router.back() }])
   }
 

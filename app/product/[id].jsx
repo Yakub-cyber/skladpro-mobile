@@ -29,10 +29,15 @@ export default function ProductDetail() {
   const ci = catInfo(product.category)
   const low = product.stock <= product.minStock
 
+  // Возвращает результат для QtyModal — модалка сама решит закрываться или
+  // показать ошибку. Приёмка не может отказать (только прибавляет), списание
+  // блокируется при попытке уйти в минус.
   const apply = (qty) => {
-    if (op === 'in') receiveOp([{ productId: product.id, name: product.name, qty }], 'Приёмка (моб.)')
-    else writeOff(product.id, qty, 'Списание (моб.)')
-    setOp(null)
+    if (op === 'in') {
+      receiveOp([{ productId: product.id, name: product.name, qty }], 'Приёмка (моб.)')
+      return { ok: true }
+    }
+    return writeOff(product.id, qty, 'Списание (моб.)')
   }
 
   return (
@@ -100,27 +105,48 @@ function Row({ label, value, border }) {
 
 function QtyModal({ op, product, onClose, onApply }) {
   const [qty, setQty] = useState('')
+  const [err, setErr] = useState('')
   const inMode = op === 'in'
+  const close = () => {
+    setQty('')
+    setErr('')
+    onClose()
+  }
   const submit = () => {
     const n = parseFloat(qty.replace(',', '.'))
-    if (!n || n <= 0) return
-    onApply(n)
-    setQty('')
+    if (!n || n <= 0) {
+      setErr('Укажите количество')
+      return
+    }
+    const r = onApply(n)
+    // Успех → закрыть; отказ (списание > остатка) → показать причину и оставить модалку.
+    if (r && r.ok === false) {
+      setErr(r.error || 'Не удалось выполнить операцию')
+      return
+    }
+    close()
   }
   return (
-    <Modal visible={!!op} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={!!op} animationType="slide" transparent onRequestClose={close}>
       <View className="flex-1 justify-end bg-black/50">
         <View className="bg-surface rounded-t-3xl p-5 pb-8">
           <View className="flex-row items-center justify-between mb-4">
             <Text className="text-ink text-lg font-bold">{inMode ? 'Приёмка товара' : 'Списание товара'}</Text>
-            <Pressable onPress={onClose} className="h-9 w-9 items-center justify-center">
+            <Pressable onPress={close} className="h-9 w-9 items-center justify-center">
               <X size={22} color={C.muted} />
             </Pressable>
           </View>
           <Text className="text-muted text-[13px] mb-3" numberOfLines={1}>{product?.name}</Text>
           <Field label={`Количество (${product?.unit || 'шт'})`}>
-            <Input value={qty} onChangeText={setQty} placeholder="0" keyboardType="numeric" autoFocus />
+            <Input
+              value={qty}
+              onChangeText={(v) => { setQty(v); if (err) setErr('') }}
+              placeholder="0"
+              keyboardType="numeric"
+              autoFocus
+            />
           </Field>
+          {err ? <Text className="text-[13px] text-bad mt-1 mb-1">{err}</Text> : null}
           <Btn
             title={inMode ? 'Принять на склад' : 'Списать со склада'}
             variant={inMode ? 'primary' : 'bad'}

@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { View, Text, ScrollView, Pressable, FlatList } from 'react-native'
 import { router } from 'expo-router'
-import { Search, ChevronRight, Wrench, Hammer, Zap, Droplets, PaintBucket, Package, SlidersHorizontal } from 'lucide-react-native'
+import { Search, ChevronRight, Wrench, Hammer, Zap, Droplets, PaintBucket, Package, SlidersHorizontal, Upload } from 'lucide-react-native'
 import { useStore } from '../../store/useStore'
 import { Screen, Input, Empty, C } from '../../components/ui'
 import { money, num } from '../../lib/format'
@@ -42,7 +42,13 @@ export default function Products() {
   const Header = (
     <View>
       <View className="px-4 pt-3 pb-1">
-        <Text className="text-ink text-xl font-bold">Товары</Text>
+        <View className="flex-row items-center justify-between mb-1">
+          <Text className="text-ink text-xl font-bold">Товары</Text>
+          <Pressable onPress={() => router.push('/import-products')} className="flex-row items-center h-8 px-3 rounded-full bg-surface-2 border border-line active:opacity-80">
+            <Upload size={14} color={C.brand} />
+            <Text className="text-brand text-[12px] font-medium ml-1.5">Импорт</Text>
+          </Pressable>
+        </View>
         <Text className="text-muted text-[13px] mb-3">{products.length} SKU · склад на {money(totalValue)}</Text>
         <View className="flex-row items-center gap-2">
           <View className="flex-1 flex-row items-center bg-surface-2 rounded-xl border border-line px-3 h-11">

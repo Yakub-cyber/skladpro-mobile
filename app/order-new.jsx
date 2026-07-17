@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react'
 import { View, Text, ScrollView, Pressable, Modal, Alert } from 'react-native'
 import { router } from 'expo-router'
-import { ChevronLeft, Search, User, Check, X, ChevronRight } from 'lucide-react-native'
+import { ChevronLeft, Search, User, UserPlus, Check, X, ChevronRight } from 'lucide-react-native'
 import { useStore } from '../store/useStore'
-import { Screen, Input, Btn, Avatar, Empty, C } from '../components/ui'
+import { Screen, Input, Btn, Avatar, Empty, Field, C } from '../components/ui'
 import { money, num } from '../lib/format'
 import { CATEGORIES, catInfo, priceFor } from '../lib/constants'
 
@@ -12,6 +12,7 @@ export default function OrderNew() {
   const customers = useStore((s) => s.customers)
   const priceTypes = useStore((s) => s.priceTypes)
   const addOrder = useStore((s) => s.addOrder)
+  const addCustomer = useStore((s) => s.addCustomer)
   const defType = priceTypes.find((t) => t.default)?.id || priceTypes[0]?.id
 
   const [q, setQ] = useState('')
@@ -19,6 +20,10 @@ export default function OrderNew() {
   const [cart, setCart] = useState({})
   const [customer, setCustomer] = useState(null)
   const [custOpen, setCustOpen] = useState(false)
+  const [showCreate, setShowCreate] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newPhone, setNewPhone] = useState('')
+  const [newCity, setNewCity] = useState('')
 
   const priceType = customer?.priceTypeId || defType
 
@@ -36,6 +41,28 @@ export default function OrderNew() {
   const rows = Object.entries(cart).map(([id, qty]) => ({ p: products.find((x) => x.id === id), qty })).filter((r) => r.p)
   const total = rows.reduce((a, r) => a + priceFor(r.p, priceType) * r.qty, 0)
   const count = rows.reduce((a, r) => a + r.qty, 0)
+
+  // Создать клиента прямо из модалки выбора — не выходя из потока заказа.
+  // addCustomer в сторе не возвращает id: только что созданный кладётся
+  // первым в массив customers.
+  const saveNewCustomer = () => {
+    const name = newName.trim()
+    if (!name) return
+    addCustomer({
+      name,
+      phone: newPhone.trim() || undefined,
+      city: newCity.trim() || undefined,
+    })
+    const created = useStore.getState().customers[0]
+    if (created) setCustomer(created)
+    setNewName(''); setNewPhone(''); setNewCity('')
+    setShowCreate(false)
+    setCustOpen(false)
+  }
+  const cancelCreate = () => {
+    setNewName(''); setNewPhone(''); setNewCity('')
+    setShowCreate(false)
+  }
 
   const create = () => {
     if (!count) return
@@ -134,31 +161,61 @@ export default function OrderNew() {
       )}
 
       {/* Выбор клиента */}
-      <Modal visible={custOpen} animationType="slide" transparent onRequestClose={() => setCustOpen(false)}>
+      <Modal visible={custOpen} animationType="slide" transparent onRequestClose={() => { cancelCreate(); setCustOpen(false) }}>
         <View className="flex-1 justify-end bg-black/50">
-          <View className="bg-surface rounded-t-3xl pt-5 pb-8" style={{ maxHeight: '75%' }}>
+          <View className="bg-surface rounded-t-3xl pt-5 pb-8" style={{ maxHeight: '85%' }}>
             <View className="flex-row items-center justify-between px-5 mb-3">
               <Text className="text-ink text-lg font-bold">Клиент</Text>
-              <Pressable onPress={() => setCustOpen(false)} className="h-9 w-9 items-center justify-center"><X size={22} color={C.muted} /></Pressable>
+              <View className="flex-row items-center">
+                {!showCreate && (
+                  <Pressable onPress={() => setShowCreate(true)} className="flex-row items-center h-9 px-3 rounded-full bg-surface-2 border border-line active:opacity-80 mr-2">
+                    <UserPlus size={15} color={C.brand} />
+                    <Text className="text-brand text-[13px] font-medium ml-1.5">Добавить</Text>
+                  </Pressable>
+                )}
+                <Pressable onPress={() => { cancelCreate(); setCustOpen(false) }} className="h-9 w-9 items-center justify-center"><X size={22} color={C.muted} /></Pressable>
+              </View>
             </View>
-            <ScrollView className="px-5">
-              <Pressable onPress={() => { setCustomer(null); setCustOpen(false) }} className="flex-row items-center py-3 border-b border-line">
-                <Avatar name="Розничный" color={C.muted} size={38} />
-                <Text className="text-ink text-[14px] ml-3 flex-1">Розничный покупатель</Text>
-                {!customer && <Check size={18} color={C.brand} />}
-              </Pressable>
-              {customers.map((c) => (
-                <Pressable key={c.id} onPress={() => { setCustomer(c); setCustOpen(false) }} className="flex-row items-center py-3 border-b border-line">
-                  <Avatar name={c.name} color={C.info} size={38} />
-                  <View className="flex-1 ml-3">
-                    <Text className="text-ink text-[14px]" numberOfLines={1}>{c.name}</Text>
-                    <Text className="text-muted text-[12px]">{c.city || ''}</Text>
+            {showCreate ? (
+              <View className="px-5">
+                <Field label="Имя / название">
+                  <Input value={newName} onChangeText={setNewName} placeholder="Например, ИП Иванов" autoFocus />
+                </Field>
+                <Field label="Телефон">
+                  <Input value={newPhone} onChangeText={setNewPhone} placeholder="+7 (___) ___-__-__" keyboardType="phone-pad" />
+                </Field>
+                <Field label="Город">
+                  <Input value={newCity} onChangeText={setNewCity} placeholder="Москва" />
+                </Field>
+                <View className="flex-row gap-3 mt-2">
+                  <View className="flex-1">
+                    <Btn title="Отмена" variant="soft" onPress={cancelCreate} />
                   </View>
-                  {customer?.id === c.id && <Check size={18} color={C.brand} />}
+                  <View className="flex-1">
+                    <Btn title="Сохранить" onPress={saveNewCustomer} />
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <ScrollView className="px-5">
+                <Pressable onPress={() => { setCustomer(null); setCustOpen(false) }} className="flex-row items-center py-3 border-b border-line">
+                  <Avatar name="Розничный" color={C.muted} size={38} />
+                  <Text className="text-ink text-[14px] ml-3 flex-1">Розничный покупатель</Text>
+                  {!customer && <Check size={18} color={C.brand} />}
                 </Pressable>
-              ))}
-              {customers.length === 0 && <Empty title="Клиентов нет" />}
-            </ScrollView>
+                {customers.map((c) => (
+                  <Pressable key={c.id} onPress={() => { setCustomer(c); setCustOpen(false) }} className="flex-row items-center py-3 border-b border-line">
+                    <Avatar name={c.name} color={C.info} size={38} />
+                    <View className="flex-1 ml-3">
+                      <Text className="text-ink text-[14px]" numberOfLines={1}>{c.name}</Text>
+                      <Text className="text-muted text-[12px]">{c.city || ''}</Text>
+                    </View>
+                    {customer?.id === c.id && <Check size={18} color={C.brand} />}
+                  </Pressable>
+                ))}
+                {customers.length === 0 && <Empty title="Клиентов нет" />}
+              </ScrollView>
+            )}
           </View>
         </View>
       </Modal>

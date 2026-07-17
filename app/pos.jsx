@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react'
 import { View, Text, ScrollView, Pressable, Modal, Alert } from 'react-native'
 import { router } from 'expo-router'
-import { ChevronLeft, Search, ScanLine, Plus, Minus, Check, X, Trash2, Wallet } from 'lucide-react-native'
+import { ChevronLeft, Plus, Minus, Check, X, Trash2, Wallet } from 'lucide-react-native'
 import { useStore } from '../store/useStore'
 import { Screen, Input, Btn, C } from '../components/ui'
 import { money, num } from '../lib/format'
 import { CATEGORIES, catInfo } from '../lib/constants'
-import Scanner from '../components/Scanner'
+import SmartFind from '../components/SmartFind'
 
 export default function Pos() {
   const products = useStore((s) => s.products)
@@ -14,7 +14,6 @@ export default function Pos() {
   const [q, setQ] = useState('')
   const [cat, setCat] = useState('all')
   const [cart, setCart] = useState({}) // productId -> qty
-  const [scanOpen, setScanOpen] = useState(false)
   const [cartOpen, setCartOpen] = useState(false)
   const [payOpen, setPayOpen] = useState(false)
 
@@ -41,7 +40,6 @@ export default function Pos() {
 
   const onScan = (code) => {
     const p = products.find((x) => x.barcode === code || x.sku === code)
-    setScanOpen(false)
     if (p) add(p.id)
     else Alert.alert('Не найдено', `Товар со штрихкодом ${code} не найден`)
   }
@@ -72,15 +70,9 @@ export default function Pos() {
         <Text className="text-ink text-lg font-semibold ml-1">Касса</Text>
       </View>
 
-      {/* Поиск + сканер */}
-      <View className="flex-row items-center gap-2 px-4 py-3">
-        <View className="flex-1 flex-row items-center bg-surface-2 rounded-xl border border-line px-3 h-11">
-          <Search size={16} color={C.muted} />
-          <Input value={q} onChangeText={setQ} placeholder="Поиск товара…" className="flex-1 h-11 px-2 bg-transparent border-0" />
-        </View>
-        <Pressable onPress={() => setScanOpen(true)} className="h-11 w-11 rounded-xl bg-brand items-center justify-center active:opacity-80">
-          <ScanLine size={20} color="#fff" />
-        </Pressable>
+      {/* Поиск + сканер (единый SmartFind — общий с document/order-new) */}
+      <View className="px-4 py-3">
+        <SmartFind value={q} onChangeText={setQ} onScan={onScan} placeholder="Поиск товара…" />
       </View>
 
       {/* Категории */}
@@ -155,7 +147,6 @@ export default function Pos() {
       {/* Оплата */}
       <PayModal open={payOpen} total={total} onClose={() => setPayOpen(false)} onConfirm={checkout} />
 
-      <Scanner visible={scanOpen} onScan={onScan} onClose={() => setScanOpen(false)} />
     </Screen>
   )
 }

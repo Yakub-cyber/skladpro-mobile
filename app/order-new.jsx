@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react'
 import { View, Text, ScrollView, Pressable, Modal, Alert } from 'react-native'
 import { router } from 'expo-router'
-import { ChevronLeft, Search, User, UserPlus, Check, X, ChevronRight } from 'lucide-react-native'
+import { ChevronLeft, User, UserPlus, Check, X, ChevronRight } from 'lucide-react-native'
 import { useStore } from '../store/useStore'
 import { Screen, Input, Btn, Avatar, Empty, Field, C } from '../components/ui'
+import SmartFind from '../components/SmartFind'
 import { money, num } from '../lib/format'
 import { CATEGORIES, catInfo, priceFor } from '../lib/constants'
 
@@ -97,12 +98,18 @@ export default function OrderNew() {
         <ChevronRight size={16} color={C.muted} />
       </Pressable>
 
-      {/* Поиск + категории */}
+      {/* Поиск + сканер + категории */}
       <View className="px-4 pt-2">
-        <View className="flex-row items-center bg-surface-2 rounded-xl border border-line px-3 h-11">
-          <Search size={16} color={C.muted} />
-          <Input value={q} onChangeText={setQ} placeholder="Поиск товара…" className="flex-1 h-11 px-2 bg-transparent border-0" />
-        </View>
+        <SmartFind
+          value={q}
+          onChangeText={setQ}
+          onScan={(code) => {
+            const p = products.find((x) => x.barcode === code || x.sku === code)
+            if (p) add(p.id)
+            else Alert.alert('Не найдено', `Товар со штрихкодом ${code} не найден`)
+          }}
+          placeholder="Поиск товара…"
+        />
       </View>
       <View className="h-11 mt-2">
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, alignItems: 'center' }}>

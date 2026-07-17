@@ -3,7 +3,8 @@ import { View, Text, ScrollView, Pressable, Alert } from 'react-native'
 import { useLocalSearchParams, router } from 'expo-router'
 import { ChevronLeft, Search, Plus, Minus, Check, FileEdit } from 'lucide-react-native'
 import { useStore } from '../store/useStore'
-import { Screen, Input, Btn, Empty, C } from '../components/ui'
+import { Screen, Btn, Empty, C } from '../components/ui'
+import SmartFind from '../components/SmartFind'
 import { num, money } from '../lib/format'
 import { catInfo } from '../lib/constants'
 
@@ -39,6 +40,21 @@ export default function DocumentScreen() {
   const dec = (p) => setVal(p.id, Math.max(0, (qty[p.id] ?? (t.count ? p.stock : 0)) - 1))
 
   const picked = Object.keys(qty).length
+
+  // Скан штрихкода: находим товар и добавляем/увеличиваем позицию.
+  // Для инвентаризации фактический остаток при скане не меняем — только
+  // «касаемся» позиции (setVal с текущим stock), иначе пересчёт увеличит
+  // и без того зафиксированный fact.
+  const onScan = (code) => {
+    const p = products.find((x) => x.barcode === code || x.sku === code)
+    if (!p) {
+      Alert.alert('Не найдено', `Товар со штрихкодом ${code} не найден`)
+      return
+    }
+    if (t.count) setVal(p.id, qty[p.id] ?? p.stock)
+    else add(p)
+  }
+
   const apply = (post = true) => {
     const entries = Object.entries(qty)
     if (!entries.length) return
@@ -72,10 +88,7 @@ export default function DocumentScreen() {
       </View>
 
       <View className="px-4 py-3">
-        <View className="flex-row items-center bg-surface-2 rounded-xl border border-line px-3 h-11">
-          <Search size={16} color={C.muted} />
-          <Input value={q} onChangeText={setQ} placeholder="Поиск товара…" className="flex-1 h-11 px-2 bg-transparent border-0" />
-        </View>
+        <SmartFind value={q} onChangeText={setQ} onScan={onScan} placeholder="Поиск товара…" />
         {t.count && <Text className="text-muted text-[12px] mt-2">Укажите фактический остаток по каждой позиции</Text>}
         {t.transfer && (
           <View className="mt-3">

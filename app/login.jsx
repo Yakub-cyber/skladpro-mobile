@@ -36,7 +36,7 @@ export default function Login() {
       setErr(r.error)
       setBusy(false)
     } else if (r.needConfirm) {
-      setInfo('Аккаунт создан. Подтвердите email по ссылке из письма, затем войдите.')
+      setInfo(`Аккаунт создан. На ${email} отправлено письмо с подтверждением — перейдите по ссылке и войдите.`)
       setMode('signin')
       setBusy(false)
     } else {

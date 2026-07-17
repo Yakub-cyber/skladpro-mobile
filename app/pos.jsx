@@ -7,6 +7,7 @@ import { Screen, Input, Btn, C } from '../components/ui'
 import { money, num } from '../lib/format'
 import { CATEGORIES, catInfo } from '../lib/constants'
 import SmartFind from '../components/SmartFind'
+import ProductTile from '../components/ProductTile'
 
 export default function Pos() {
   const products = useStore((s) => s.products)
@@ -37,6 +38,7 @@ export default function Pos() {
       else next[id] = n
       return next
     })
+  const removeFromCart = (id) => setCart((c) => { const next = { ...c }; delete next[id]; return next })
 
   const onScan = (code) => {
     const p = products.find((x) => x.barcode === code || x.sku === code)
@@ -98,32 +100,17 @@ export default function Pos() {
       {/* Сетка плиток товаров */}
       <ScrollView contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: count ? 104 : 16 }}>
         <View className="flex-row flex-wrap">
-          {list.map((p) => {
-            const ci = catInfo(p.category)
-            const qty = cart[p.id] || 0
-            return (
-              <View key={p.id} className="w-1/2 p-1.5">
-                <Pressable
-                  onPress={() => add(p.id)}
-                  className="rounded-2xl p-3 active:opacity-80"
-                  style={{ height: 116, backgroundColor: ci.color + '14', borderWidth: 1, borderColor: qty > 0 ? ci.color : ci.color + '33' }}
-                >
-                  {qty > 0 && (
-                    <View className="absolute top-2 right-2 h-6 min-w-6 px-1.5 rounded-full items-center justify-center z-10" style={{ backgroundColor: ci.color }}>
-                      <Text className="text-white text-[12px] font-bold">{qty}</Text>
-                    </View>
-                  )}
-                  <View className="flex-1 justify-between">
-                    <Text className="text-ink text-[13px] font-medium leading-[17px]" numberOfLines={2}>{p.name}</Text>
-                    <View>
-                      <Text className="font-bold text-[15px]" style={{ color: ci.color }}>{money(p.price)}</Text>
-                      <Text className="text-muted text-[11px]">{num(p.stock)} {p.unit}</Text>
-                    </View>
-                  </View>
-                </Pressable>
-              </View>
-            )
-          })}
+          {list.map((p) => (
+            <View key={p.id} className="w-1/2 p-1.5">
+              <ProductTile
+                product={p}
+                qty={cart[p.id] || 0}
+                onInc={() => add(p.id)}
+                onDec={() => dec(p.id)}
+                onRemove={() => removeFromCart(p.id)}
+              />
+            </View>
+          ))}
         </View>
       </ScrollView>
 

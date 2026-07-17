@@ -5,6 +5,7 @@ import { ChevronLeft, User, UserPlus, Check, X, ChevronRight } from 'lucide-reac
 import { useStore } from '../store/useStore'
 import { Screen, Input, Btn, Avatar, Empty, Field, C } from '../components/ui'
 import SmartFind from '../components/SmartFind'
+import ProductTile from '../components/ProductTile'
 import { money, num } from '../lib/format'
 import { CATEGORIES, catInfo, priceFor } from '../lib/constants'
 
@@ -38,6 +39,7 @@ export default function OrderNew() {
   const chips = [{ key: 'all', name: 'Все', color: C.brand }, ...CATEGORIES.map((c) => ({ key: c.key, name: c.key, color: c.color }))]
   const add = (id) => setCart((c) => ({ ...c, [id]: (c[id] || 0) + 1 }))
   const dec = (id) => setCart((c) => { const n = (c[id] || 0) - 1; const x = { ...c }; if (n <= 0) delete x[id]; else x[id] = n; return x })
+  const removeFromCart = (id) => setCart((c) => { const x = { ...c }; delete x[id]; return x })
 
   const rows = Object.entries(cart).map(([id, qty]) => ({ p: products.find((x) => x.id === id), qty })).filter((r) => r.p)
   const total = rows.reduce((a, r) => a + priceFor(r.p, priceType) * r.qty, 0)
@@ -128,28 +130,18 @@ export default function OrderNew() {
       {/* Плитки */}
       <ScrollView contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: count ? 104 : 16 }}>
         <View className="flex-row flex-wrap">
-          {list.map((p) => {
-            const ci = catInfo(p.category)
-            const qty = cart[p.id] || 0
-            return (
-              <View key={p.id} className="w-1/2 p-1.5">
-                <Pressable onPress={() => add(p.id)} className="rounded-2xl p-3 active:opacity-80" style={{ height: 116, backgroundColor: ci.color + '14', borderWidth: 1, borderColor: qty > 0 ? ci.color : ci.color + '33' }}>
-                  {qty > 0 && (
-                    <View className="absolute top-2 right-2 h-6 min-w-6 px-1.5 rounded-full items-center justify-center z-10" style={{ backgroundColor: ci.color }}>
-                      <Text className="text-white text-[12px] font-bold">{qty}</Text>
-                    </View>
-                  )}
-                  <View className="flex-1 justify-between">
-                    <Text className="text-ink text-[13px] font-medium leading-[17px]" numberOfLines={2}>{p.name}</Text>
-                    <View>
-                      <Text className="font-bold text-[15px]" style={{ color: ci.color }}>{money(priceFor(p, priceType))}</Text>
-                      <Text className="text-muted text-[11px]">{num(p.stock)} {p.unit}</Text>
-                    </View>
-                  </View>
-                </Pressable>
-              </View>
-            )
-          })}
+          {list.map((p) => (
+            <View key={p.id} className="w-1/2 p-1.5">
+              <ProductTile
+                product={p}
+                qty={cart[p.id] || 0}
+                price={priceFor(p, priceType)}
+                onInc={() => add(p.id)}
+                onDec={() => dec(p.id)}
+                onRemove={() => removeFromCart(p.id)}
+              />
+            </View>
+          ))}
         </View>
       </ScrollView>
 

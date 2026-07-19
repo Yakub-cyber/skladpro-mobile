@@ -8,8 +8,9 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://xekqnshkfthvnqfxxjtf.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_n8r-hX_5HGpuCXTpIDnvhw_5MXzBWUE"
+        "EXPO_PUBLIC_API_URL": "http://10.0.2.2:3000",
+        "EXPO_PUBLIC_SENTRY_DSN": "",
+        "EXPO_PUBLIC_SENTRY_ENV": "development"
       }
     },
     "preview": {
@@ -18,8 +19,9 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://xekqnshkfthvnqfxxjtf.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_n8r-hX_5HGpuCXTpIDnvhw_5MXzBWUE"
+        "EXPO_PUBLIC_API_URL": "https://api.skladpro.example",
+        "EXPO_PUBLIC_SENTRY_DSN": "",
+        "EXPO_PUBLIC_SENTRY_ENV": "staging"
       }
     },
     "production": {
@@ -28,8 +30,9 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://xekqnshkfthvnqfxxjtf.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_n8r-hX_5HGpuCXTpIDnvhw_5MXzBWUE"
+        "EXPO_PUBLIC_API_URL": "https://api.skladpro.example",
+        "EXPO_PUBLIC_SENTRY_DSN": "",
+        "EXPO_PUBLIC_SENTRY_ENV": "production"
       }
     }
   },

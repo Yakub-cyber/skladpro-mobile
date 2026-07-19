@@ -7,6 +7,7 @@ import { nextStatus, statusInfo, docTypeInfo, DEFAULT_WORK_ZONES } from '../lib/
 import { hasSupabase } from '../lib/supabase'
 import { applyDocToState } from '../lib/docEngine'
 import { applyOrderStock, stockConsumedFromStatus, migrateReservationV8, CONSUMED_STATUSES } from '../lib/orders'
+import { hashPin, verifyPin, isHashedPin } from '../lib/crypto'
 import {
   cloudLoadAll,
   cloudLoadMerged,
@@ -976,25 +977,41 @@ export const useStore = create(
         })),
 
       // ── Сотрудники / роли ────────────────────────────────────
+      // Хешируем PIN при создании/обновлении, если пришёл сырой (короче 64 hex).
+      // Так админ, задавая PIN «1234» через UI, автоматически получает hash.
       addEmployee: (e) =>
-        set((s) => ({
-          employees: [...s.employees, { id: uid('e'), active: true, role: 'stock', ...e }],
-        })),
+        set((s) => {
+          const emp = { id: uid('e'), active: true, role: 'stock', ...e }
+          if (emp.pin && !isHashedPin(emp.pin)) emp.pin = hashPin(emp.pin)
+          return { employees: [...s.employees, emp] }
+        }),
       updateEmployee: (id, patch) =>
-        set((s) => ({
-          employees: s.employees.map((e) => (e.id === id ? { ...e, ...patch } : e)),
-        })),
+        set((s) => {
+          const p = { ...patch }
+          if (p.pin != null && p.pin !== '' && !isHashedPin(p.pin)) p.pin = hashPin(p.pin)
+          return { employees: s.employees.map((e) => (e.id === id ? { ...e, ...p } : e)) }
+        }),
       removeEmployee: (id) =>
         set((s) => ({
           employees: s.employees.filter((e) => e.id !== id),
           authUserId: s.authUserId === id ? null : s.authUserId,
         })),
-      // Авторизация по PIN (клиентская; под реальный бэкенд — заменить на API)
+      // Авторизация по PIN. verifyPin понимает и SHA-256, и legacy сырой
+      // (для seed «1111/2222/…» и до-миграционных записей). При legacy
+      // совпадении лениво перезаписываем на hash, чтобы следующая проверка
+      // уже пошла через хеш.
       login: (id, pin) => {
         const e = get().employees.find((x) => x.id === id)
         if (!e) return { ok: false, error: 'Сотрудник не найден' }
         if (!e.active) return { ok: false, error: 'Учётная запись отключена' }
-        if (String(e.pin) !== String(pin)) return { ok: false, error: 'Неверный PIN' }
+        const r = verifyPin(pin, e.pin)
+        if (!r.ok) return { ok: false, error: 'Неверный PIN' }
+        if (r.legacy) {
+          // ленивая миграция plaintext → hash
+          set((s) => ({
+            employees: s.employees.map((x) => (x.id === id ? { ...x, pin: hashPin(pin) } : x)),
+          }))
+        }
         set({ authUserId: e.id })
         get().logAction('Вход в систему', { section: 'Авторизация', type: 'login' })
         return { ok: true }

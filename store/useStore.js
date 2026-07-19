@@ -1029,7 +1029,7 @@ export const useStore = create(
     {
       name: 'sklad.db',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 8,
+      version: 9,
       // не сохраняем runtime-флаги облака (иначе после reload не переинициализируется)
       partialize: (state) => {
         const { _authInited, _bootBusy, _creating, _ordersSub, sessionChecked, cloudReady, needOnboarding, recoveryMode, cloudError, ...rest } = state
@@ -1121,6 +1121,22 @@ export const useStore = create(
           const migrated = migrateReservationV8(state)
           state.orders = migrated.orders
           state.products = migrated.products
+        }
+        if (version < 9) {
+          // FIFO/партии (P0.2). Создаём начальную партию из текущих stock+cost
+          // (единственная известная точка «истории»). Товары с 0 stock —
+          // пустой массив batches (ветка hasBatches заработает после
+          // первого прихода).
+          const at = new Date(2020, 0, 1).toISOString()
+          state.products = (state.products || []).map((p) => {
+            if (Array.isArray(p.batches)) return p
+            const stock = Number(p.stock) || 0
+            const cost = Number(p.cost) || 0
+            const batches = stock > 0
+              ? [{ id: uid('b'), qty: stock, cost, at }]
+              : []
+            return { ...p, batches }
+          })
         }
         return state
       },

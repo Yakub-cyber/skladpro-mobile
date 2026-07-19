@@ -6,6 +6,7 @@ import { uid, docNo } from '../lib/id'
 import { nextStatus, statusInfo, docTypeInfo, DEFAULT_WORK_ZONES } from '../lib/constants'
 import { hasSupabase } from '../lib/supabase'
 import { applyDocToState } from '../lib/docEngine'
+import { applyOrderStock, stockConsumedFromStatus, migrateReservationV8, CONSUMED_STATUSES } from '../lib/orders'
 import {
   cloudLoadAll,
   cloudLoadMerged,
@@ -25,9 +26,8 @@ import {
   checkRecovery,
   changePassword,
   subscribeOrders,
-  savePushToken,
 } from '../lib/cloud'
-import { initPush, notify, getDeviceToken } from '../lib/push'
+import { initPush, notify, registerPushOnServer, unregisterPushOnServer } from '../lib/push'
 
 // Слой данных. Сейчас источник истины — localStorage (persist).
 // Чтобы переключиться на реальный API/Supabase, эти actions заменяются
@@ -159,20 +159,26 @@ export const useStore = create(
           attachSync(useStore)
           // Уведомления: realtime-подписка на заказы компании
           initPush()
-          // FCM-токен для push на закрытое приложение (если настроен Firebase)
-          getDeviceToken().then((t) => t && savePushToken(t, companyId)).catch(() => {})
+          // FCM push: регистрируем токен устройства на новом бэкенде
+          // (POST /v1/push/tokens). Работает только в standalone-сборке с
+          // google-services.json — иначе getDeviceToken вернёт null и мы noop.
+          registerPushOnServer().catch(() => {})
           const prevSub = get()._ordersSub
           if (prevSub) prevSub()
-          const meId = me.id
           const myRole = me.role
-          const unsub = subscribeOrders(companyId, (payload) => {
-            const { eventType, new: nw, old } = payload
-            if (eventType === 'INSERT' && myRole !== 'courier') {
-              notify('Новый заказ', `${nw.no} · ${nw.customer_name || ''}`.trim(), { id: nw.id })
-            } else if (eventType === 'UPDATE' && nw.assigned_to === meId && old?.assigned_to !== nw.assigned_to) {
-              notify('Заказ на доставку', `Вам назначен ${nw.no}`, { id: nw.id })
-            } else if (eventType === 'UPDATE' && nw.status === 'delivered' && old?.status !== 'delivered' && myRole !== 'courier') {
-              notify('Заказ доставлен', `${nw.no} · ${nw.customer_name || ''}`.trim(), { id: nw.id })
+          // Новый SSE-формат событий: { companyId, type, id, at }
+          // type ∈ 'sale' | 'order_status' | 'return' | 'payment' | 'document' | 'mark_codes'
+          // Локальное уведомление — если приложение открыто. Фон — FCM push шлёт бэкенд.
+          const unsub = subscribeOrders(companyId, (ev) => {
+            if (!ev || ev.companyId !== companyId) return
+            if (ev.type === 'sale' && myRole !== 'courier') {
+              notify('Новая продажа', `Чек №${ev.id ?? ''}`.trim(), { type: 'sale', id: String(ev.id ?? '') })
+            } else if (ev.type === 'order_status' && myRole !== 'courier') {
+              notify('Заказ обновлён', `Статус заказа №${ev.id ?? ''}`, { type: 'order', id: String(ev.id ?? '') })
+            } else if (ev.type === 'return') {
+              notify('Возврат', `Возврат по заказу №${ev.id ?? ''}`, { type: 'return', id: String(ev.id ?? '') })
+            } else if (ev.type === 'payment') {
+              notify('Оплата от клиента', 'Погашение долга клиента', { type: 'payment', id: String(ev.id ?? '') })
             }
           })
           set({ _ordersSub: unsub })
@@ -204,6 +210,8 @@ export const useStore = create(
         return r
       },
       cloudLogout: async () => {
+        // Снимаем FCM токен с сервера, чтобы push'ы больше не приходили этому устройству
+        try { await unregisterPushOnServer() } catch {}
         get()._ordersSub?.()
         await cloudSignOut()
         set({ authUserId: null, cloudReady: false, needOnboarding: false, companyId: null, companyName: null, _ordersSub: null })
@@ -621,6 +629,9 @@ export const useStore = create(
       },
 
       // ── Заказы ───────────────────────────────────────────────
+      // Модель (после P0.1): addOrder только держит резерв (stock не трогается),
+      // физическое списание — в setOrderStatus при переходе в shipped/delivered
+      // через applyOrderStock(-1). Долг «в долг» — начисляется сразу.
       addOrder: (order) => {
         const id = uid('o')
         set((s) => {
@@ -633,18 +644,9 @@ export const useStore = create(
             track: [{ status: 'new', at: new Date().toISOString() }],
             priority: false,
             shiftId: s.activeShiftId || null,
+            stockConsumed: false,
             ...order,
           }
-          // резерв остатков + выбытие кодов маркировки «Честный знак»
-          const products = s.products.map((p) => {
-            const it = (order.items || []).find((x) => x.productId === p.id)
-            if (!it) return p
-            const np = { ...p, stock: Math.max(0, p.stock - it.qty) }
-            if (p.marked && p.codes?.length) {
-              np.codes = p.codes.slice(Math.ceil(it.qty)) // первые коды выбывают
-            }
-            return np
-          })
           // заказ «в долг» увеличивает задолженность контрагента
           let customers = s.customers
           if (order.onCredit && order.customerId) {
@@ -654,7 +656,7 @@ export const useStore = create(
                 : c,
             )
           }
-          return { orders: [o, ...s.orders], products, customers }
+          return { orders: [o, ...s.orders], customers }
         })
         const o = get().orders.find((x) => x.id === id)
         get().logAction(`Создан заказ ${o?.no} на ${order.total || 0} ₽`, {
@@ -663,16 +665,30 @@ export const useStore = create(
         })
       },
       setOrderStatus: (id, status, note) => {
-        set((s) => ({
-          orders: s.orders.map((o) => {
-            if (o.id !== id) return o
-            const track = [
-              ...(o.track || []),
-              { status, at: new Date().toISOString(), ...(note ? { note } : {}) },
-            ]
-            return { ...o, status, track }
-          }),
-        }))
+        set((s) => {
+          const o = s.orders.find((x) => x.id === id)
+          if (!o) return {}
+          const track = [
+            ...(o.track || []),
+            { status, at: new Date().toISOString(), ...(note ? { note } : {}) },
+          ]
+          // Первый переход в отгрузку — физически списываем остаток и коды
+          // маркировки. Идемпотентно: если stockConsumed уже true, не списываем
+          // повторно (переход shipped→delivered или ручной advance назад).
+          const shouldConsume = !o.stockConsumed && CONSUMED_STATUSES.includes(status)
+          if (shouldConsume) {
+            const r = applyOrderStock(s, o, -1)
+            return {
+              products: r.products,
+              orders: s.orders.map((x) =>
+                x.id === id ? { ...r.order, status, track, stockConsumed: true } : x,
+              ),
+            }
+          }
+          return {
+            orders: s.orders.map((x) => (x.id === id ? { ...x, status, track } : x)),
+          }
+        })
         const o = get().orders.find((x) => x.id === id)
         get().logAction(`Заказ ${o?.no} → ${statusInfo(status).label}`, {
           section: 'Заказы',
@@ -717,22 +733,48 @@ export const useStore = create(
         return { ok: true }
       },
       cancelOrder: (id) => {
-        const o = get().orders.find((x) => x.id === id)
-        set((s) => ({
-          orders: s.orders.map((x) =>
-            x.id === id
-              ? {
-                  ...x,
-                  status: 'cancelled',
-                  track: [
-                    ...(x.track || []),
-                    { status: 'cancelled', at: new Date().toISOString() },
-                  ],
-                }
-              : x,
-          ),
-        }))
-        get().logAction(`Отменён заказ ${o?.no}`, { section: 'Заказы', type: 'delete' })
+        const o0 = get().orders.find((x) => x.id === id)
+        if (!o0 || o0.status === 'cancelled') return // идемпотентно
+        set((s) => {
+          const o = s.orders.find((x) => x.id === id)
+          if (!o) return {}
+          // Если заказ уже отгружен — возвращаем остатки и коды маркировки на склад.
+          let products = s.products
+          let restoredItems = o.items
+          if (o.stockConsumed) {
+            const r = applyOrderStock(s, o, 1)
+            products = r.products
+            restoredItems = r.order.items
+          }
+          // Реверс долга «в долг» — снимаем задолженность клиента.
+          let customers = s.customers
+          if (o.onCredit && o.customerId) {
+            customers = s.customers.map((c) =>
+              c.id === o.customerId
+                ? { ...c, balance: Math.max(0, (c.balance || 0) - (o.total || 0)) }
+                : c,
+            )
+          }
+          return {
+            products,
+            customers,
+            orders: s.orders.map((x) =>
+              x.id === id
+                ? {
+                    ...x,
+                    items: restoredItems,
+                    status: 'cancelled',
+                    stockConsumed: false,
+                    track: [
+                      ...(x.track || []),
+                      { status: 'cancelled', at: new Date().toISOString() },
+                    ],
+                  }
+                : x,
+            ),
+          }
+        })
+        get().logAction(`Отменён заказ ${o0.no}`, { section: 'Заказы', type: 'delete' })
       },
       // Назначить заказ конкретному курьеру (сотруднику) — он видит только свои
       assignCourier: (id, employeeId) => {
@@ -970,7 +1012,7 @@ export const useStore = create(
     {
       name: 'sklad.db',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 7,
+      version: 8,
       // не сохраняем runtime-флаги облака (иначе после reload не переинициализируется)
       partialize: (state) => {
         const { _authInited, _bootBusy, _creating, _ordersSub, sessionChecked, cloudReady, needOnboarding, recoveryMode, cloudError, ...rest } = state
@@ -1053,6 +1095,15 @@ export const useStore = create(
         if (version < 7) {
           // реестр документов
           state.documents = state.documents || []
+        }
+        if (version < 8) {
+          // Модель резерв vs consumed (P0.1). До v8 addOrder списывал stock
+          // сразу, коды маркировки уходили в it.codes. migrateReservationV8
+          // возвращает остатки открытым заказам и коды в пул, ставит
+          // stockConsumed=true отгруженным.
+          const migrated = migrateReservationV8(state)
+          state.orders = migrated.orders
+          state.products = migrated.products
         }
         return state
       },
